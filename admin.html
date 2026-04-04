@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KAG Admin Dashboard - Manage Bookings</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <h1><span class="kag-highlight">KAG</span> Admin</h1>
+                    <p class="logo-sub">Kenya Assemblies of God</p>
+                </div>
+                <div class="header-actions">
+                    <button class="theme-toggle" id="themeToggle">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                    <button class="logout-btn" id="logoutBtn">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Login Overlay -->
+        <div class="login-overlay" id="loginOverlay">
+            <div class="login-modal">
+                <div class="login-icon">
+                    <i class="fas fa-church"></i>
+                </div>
+                <h2>Admin Login</h2>
+                <p>Enter password to access dashboard</p>
+                <input type="password" id="adminPassword" placeholder="Enter password" class="login-input">
+                <button id="loginBtn" class="btn-primary">Login <i class="fas fa-arrow-right"></i></button>
+                <p class="login-note">Default password: admin254</p>
+            </div>
+        </div>
+
+        <!-- Dashboard Content (Hidden until login) -->
+        <div class="dashboard-content" id="dashboardContent" style="display: none;">
+            <!-- Stats Cards -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <i class="fas fa-calendar-alt"></i>
+                    <h3>Total Bookings</h3>
+                    <p class="stat-number" id="totalBookings">0</p>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-user-check"></i>
+                    <h3>Today's Check-ins</h3>
+                    <p class="stat-number" id="todayCheckins">0</p>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-money-bill-wave"></i>
+                    <h3>Total Earnings</h3>
+                    <p class="stat-number" id="totalEarnings">KES 0</p>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-bed"></i>
+                    <h3>Occupancy Rate</h3>
+                    <p class="stat-number" id="occupancyRate">0%</p>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="admin-tabs">
+                <button class="tab-btn active" data-tab="bookings"><i class="fas fa-book"></i> Bookings</button>
+                <button class="tab-btn" data-tab="rooms"><i class="fas fa-hotel"></i> Room Rates</button>
+                <button class="tab-btn" data-tab="items"><i class="fas fa-tshirt"></i> Item Tracking</button>
+                <button class="tab-btn" data-tab="reports"><i class="fas fa-chart-bar"></i> Reports</button>
+            </div>
+
+            <!-- Bookings Tab -->
+            <div class="tab-content active" id="bookingsTab">
+                <div class="section-header">
+                    <h3><i class="fas fa-list"></i> All Bookings</h3>
+                    <div class="filter-buttons">
+                        <button class="filter-btn active" data-filter="all">All</button>
+                        <button class="filter-btn" data-filter="pending">Pending</button>
+                        <button class="filter-btn" data-filter="confirmed">Confirmed</button>
+                        <button class="filter-btn" data-filter="checked-in">Checked-in</button>
+                        <button class="filter-btn" data-filter="checked-out">Checked-out</button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="bookings-table" id="bookingsTable">
+                        <thead>
+                            <tr><th>ID</th><th>Guest</th><th>Room</th><th>Check In</th><th>Check Out</th><th>Total</th><th>Status</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody id="bookingsTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Room Rates Tab -->
+            <div class="tab-content" id="roomsTab">
+                <h3><i class="fas fa-edit"></i> Edit Room Rates</h3>
+                <div class="rooms-edit-grid" id="roomsEditGrid"></div>
+                <button class="btn-save" id="saveRoomRates"><i class="fas fa-save"></i> Save Changes</button>
+            </div>
+
+            <!-- Item Tracking Tab -->
+            <div class="tab-content" id="itemsTab">
+                <h3><i class="fas fa-clipboard-list"></i> Item Tracking (Checked-in Guests)</h3>
+                <div class="item-tracking-container" id="itemTrackingContainer"></div>
+                <div class="lost-items-section">
+                    <h4><i class="fas fa-exclamation-triangle"></i> Lost Items & Charges</h4>
+                    <div id="lostItemsList"></div>
+                </div>
+            </div>
+
+            <!-- Reports Tab -->
+            <div class="tab-content" id="reportsTab">
+                <h3><i class="fas fa-chart-line"></i> Financial Reports</h3>
+                <div class="reports-grid">
+                    <div class="report-card">
+                        <h4>Today's Earnings</h4>
+                        <p id="todayEarnings">KES 0</p>
+                    </div>
+                    <div class="report-card">
+                        <h4>This Week's Earnings</h4>
+                        <p id="weekEarnings">KES 0</p>
+                    </div>
+                    <div class="report-card">
+                        <h4>This Month's Earnings</h4>
+                        <p id="monthEarnings">KES 0</p>
+                    </div>
+                    <div class="report-card">
+                        <h4>Lost Items Charges</h4>
+                        <p id="lostItemsTotal">KES 0</p>
+                    </div>
+                </div>
+                <div class="current-guests">
+                    <h4><i class="fas fa-users"></i> Current Guests</h4>
+                    <div id="currentGuestsList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
