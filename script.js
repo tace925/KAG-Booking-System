@@ -1,111 +1,316 @@
-// Initialize Data
-let bookings = JSON.parse(localStorage.getItem('kag_bookings')) || [];
-let roomRates = JSON.parse(localStorage.getItem('kag_roomRates')) || {
-    'pastor': 1500,
-    'normal_single': 1000,
-    'normal_hall': 500,
-    'others': 800
-};
+// ============ SUPABASE CONFIGURATION ============
+const SUPABASE_URL = 'https://mkgfaiphqrhgpteyljkg.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rZ2ZhaXBocXJoZ3B0ZXlsamtnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NTM3MDAsImV4cCI6MjA5MTAyOTcwMH0.qgNczEBz614aAZvd1mTMF_oI3Ss7vzxdVQhahb4nvbI';
 
-let items = [
-    { id: 'blanket', name: 'Blanket', cost: 1500 },
-    { id: 'pillow', name: 'Pillow', cost: 800 },
-    { id: 'bedsheet', name: 'Bedsheet', cost: 1000 },
-    { id: 'towel', name: 'Towel', cost: 500 },
-    { id: 'mattress', name: 'Mattress', cost: 3000 }
-];
+// Initialize Supabase client
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-let itemAssignments = JSON.parse(localStorage.getItem('kag_itemAssignments')) || [];
+// ============ GLOBAL VARIABLES ============
+let roomData = [];
+let items = [];
+let bookings = [];
+let roomRates = {};
+let itemAssignments = [];
 
-// Room Display Names
-const roomNames = {
-    'pastor': 'Pastor Room',
-    'normal_single': 'Normal Single Room',
-    'normal_hall': 'Normal Hall (Dormitory)',
-    'others': 'Others'
-};
-
-// Save to localStorage
-function saveData() {
-    localStorage.setItem('kag_bookings', JSON.stringify(bookings));
-    localStorage.setItem('kag_roomRates', JSON.stringify(roomRates));
-    localStorage.setItem('kag_itemAssignments', JSON.stringify(itemAssignments));
+// ============ FETCH DATA FROM SUPABASE ============
+async function fetchRooms() {
+    const { data, error } = await supabase
+        .from('rooms')
+        .select('*')
+        .order('display_order');
+    
+    if (error) {
+        console.error('Error fetching rooms:', error);
+        return [];
+    }
+    
+    roomData = data.map(room => ({
+        id: room.room_id,
+        name: room.name,
+        price: room.price,
+        icon: room.icon
+    }));
+    
+    // Update roomRates
+    roomData.forEach(room => {
+        roomRates[room.id] = room.price;
+    });
+    
+    return roomData;
 }
 
-// Generate Booking ID
+async function fetchItems() {
+    const { data, error } = await supabase
+        .from('items')
+        .select('*');
+    
+    if (error) {
+        console.error('Error fetching items:', error);
+        return [];
+    }
+    
+    items = data.map(item => ({
+        id: item.item_id,
+        name: item.name,
+        cost: item.replacement_cost,
+        free: item.is_free_item,
+        freeNote: item.is_free_item ? '1 free included' : undefined
+    }));
+    
+    return items;
+}
+
+async function fetchBookings() {
+    const { data, error } = await supabase
+        .from('bookings')
+        .select('*, guests(*)');
+    
+    if (error) {
+        console.error('Error fetching bookings:', error);
+        return [];
+    }
+    
+    bookings = data.map(booking => ({
+        id: booking.booking_id,
+        roomType: booking.room_id,
+        roomName: roomData.find(r => r.id === booking.room_id)?.name || 'Unknown',
+        guestName: booking.guests?.name || 'Unknown',
+        phone: booking.guests?.phone || '',
+        email: booking.guests?.email || 'Not provided',
+        checkIn: booking.check_in,
+        checkOut: booking.check_out,
+        guests: booking.guests_count,
+        totalAmount: booking.total_amount,
+        transactionId: booking.transaction_id,
+        extraBlankets: booking.extra_blankets || 0,
+        nights: booking.nights,
+        status: booking.status,
+        createdAt: booking.created_at
+    }));
+    
+    return bookings;
+}
+
+async function fetchItemAssignments() {
+    const { data, error } = await supabase
+        .from('booking_items')
+        .select('*');
+    
+    if (error) {
+        console.error('Error fetching item assignments:', error);
+        return [];
+    }
+    
+    itemAssignments = data.map(assignment => ({
+        bookingId: assignment.booking_id,
+        itemId: assignment.item_id,
+        itemName: items.find(i => i.id === assignment.item_id)?.name || '',
+        status: assignment.status,
+        cost: assignment.status === 'lost' ? (items.find(i => i.id === assignment.item_id)?.cost || 0) : 0
+    }));
+    
+    return itemAssignments;
+}
+
+// ============ SAVE DATA TO SUPABASE ============
+async function createGuest(guestData) {
+    const { data, error } = await supabase
+        .from('guests')
+        .insert([{
+            name: guestData.name,
+            phone: guestData.phone,
+            email: guestData.email
+        }])
+        .select()
+        .single();
+    
+    if (error) throw error;
+    return data;
+}
+
+async function createBooking(bookingData, guestId) {
+    const { data, error } = await supabase
+        .from('bookings')
+        .insert([{
+            booking_id: bookingData.booking_id,
+            guest_id: guestId,
+            room_id: bookingData.room_id,
+            check_in: bookingData.check_in,
+            check_out: bookingData.check_out,
+            nights: bookingData.nights,
+            guests_count: bookingData.guests_count,
+            extra_blankets: bookingData.extra_blankets,
+            total_amount: bookingData.total_amount,
+            transaction_id: bookingData.transaction_id,
+            status: 'pending'
+        }])
+        .select()
+        .single();
+    
+    if (error) throw error;
+    return data;
+}
+
+async function createBookingItems(bookingId, requestedItems) {
+    for (const item of requestedItems) {
+        const { error } = await supabase
+            .from('booking_items')
+            .insert([{
+                booking_id: bookingId,
+                item_id: item.id,
+                status: 'assigned'
+            }]);
+        
+        if (error) console.error('Error creating booking item:', error);
+    }
+}
+
+async function updateBookingStatus(bookingId, status) {
+    const { error } = await supabase
+        .from('bookings')
+        .update({ status: status })
+        .eq('booking_id', bookingId);
+    
+    if (error) throw error;
+}
+
+async function updateItemStatus(bookingId, itemId, status) {
+    // Check if assignment exists
+    const { data: existing } = await supabase
+        .from('booking_items')
+        .select('*')
+        .eq('booking_id', bookingId)
+        .eq('item_id', itemId)
+        .single();
+    
+    if (existing) {
+        const { error } = await supabase
+            .from('booking_items')
+            .update({ 
+                status: status,
+                returned_at: status === 'returned' ? new Date().toISOString() : null
+            })
+            .eq('booking_id', bookingId)
+            .eq('item_id', itemId);
+        
+        if (error) throw error;
+    } else if (status !== 'not_assigned') {
+        const { error } = await supabase
+            .from('booking_items')
+            .insert([{
+                booking_id: bookingId,
+                item_id: itemId,
+                status: status
+            }]);
+        
+        if (error) throw error;
+    }
+}
+
+async function updateRoomRate(roomId, newRate) {
+    const { error } = await supabase
+        .from('rooms')
+        .update({ price: newRate })
+        .eq('room_id', roomId);
+    
+    if (error) throw error;
+    roomRates[roomId] = newRate;
+}
+
+// ============ HELPER FUNCTIONS (same as before) ============
 function generateBookingId() {
     return 'KAG' + Date.now() + Math.floor(Math.random() * 1000);
 }
 
-// Format Date
 function formatDate(dateString) {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-KE');
 }
 
-// Calculate Days between dates
 function calculateDays(checkIn, checkOut) {
     const start = new Date(checkIn);
     const end = new Date(checkOut);
     const diffTime = Math.abs(end - start);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+    return diffDays > 0 ? diffDays : 1;
 }
 
-// Load Rooms Grid (Guest Page)
-function loadRoomsGrid() {
+// ============ LOAD ROOMS GRID (Guest Page) ============
+async function loadRoomsGrid() {
     const roomsGrid = document.getElementById('roomsGrid');
     if (!roomsGrid) return;
     
+    await fetchRooms();
+    
     roomsGrid.innerHTML = '';
-    for (const [key, rate] of Object.entries(roomRates)) {
+    roomData.forEach(room => {
+        const rate = roomRates[room.id] || room.price;
         const roomCard = document.createElement('div');
         roomCard.className = 'room-card';
-        roomCard.setAttribute('data-room', key);
+        roomCard.setAttribute('data-room', room.id);
         roomCard.innerHTML = `
-            <i class="fas fa-bed"></i>
-            <h3>${roomNames[key]}</h3>
-            <p class="room-price">KES ${rate.toLocaleString()}<small>/day</small></p>
-            <small>${key === 'pastor' ? 'For pastoral use only' : key === 'normal_hall' ? 'Shared dormitory' : 'Private room'}</small>
+            <i class="fas ${room.icon}"></i>
+            <h3>${room.name}</h3>
+            <p class="room-price">KES ${rate.toLocaleString()}<small>/night</small></p>
         `;
         roomCard.onclick = () => {
             document.querySelectorAll('.room-card').forEach(c => c.classList.remove('selected'));
             roomCard.classList.add('selected');
-            document.getElementById('roomType').value = key;
+            document.getElementById('roomType').value = room.id;
             calculateTotal();
         };
         roomsGrid.appendChild(roomCard);
-    }
-}
-
-// Load Room Options in Select
-function loadRoomOptions() {
-    const roomSelect = document.getElementById('roomType');
-    if (!roomSelect) return;
-    
-    roomSelect.innerHTML = '<option value="">-- Select Room --</option>';
-    for (const [key, rate] of Object.entries(roomRates)) {
-        roomSelect.innerHTML += `<option value="${key}">${roomNames[key]} - KES ${rate.toLocaleString()}/day</option>`;
-    }
-}
-
-// Load Items Checkbox
-function loadItemsCheckbox() {
-    const itemsContainer = document.getElementById('itemsCheckbox');
-    if (!itemsContainer) return;
-    
-    itemsContainer.innerHTML = '';
-    items.forEach(item => {
-        itemsContainer.innerHTML += `
-            <label>
-                <input type="checkbox" value="${item.id}" class="requested-item">
-                ${item.name} (KES ${item.cost.toLocaleString()} if lost)
-            </label>
-        `;
     });
 }
 
-// Calculate Total Price
+async function loadRoomOptions() {
+    const roomSelect = document.getElementById('roomType');
+    if (!roomSelect) return;
+    
+    await fetchRooms();
+    
+    roomSelect.innerHTML = '<option value="">-- Select Room --</option>';
+    roomData.forEach(room => {
+        const rate = roomRates[room.id] || room.price;
+        roomSelect.innerHTML += `<option value="${room.id}">${room.name} - KES ${rate.toLocaleString()}/night</option>`;
+    });
+}
+
+async function loadItemsCheckbox() {
+    const itemsContainer = document.getElementById('itemsCheckbox');
+    if (!itemsContainer) return;
+    
+    await fetchItems();
+    
+    itemsContainer.innerHTML = '';
+    items.forEach(item => {
+        let labelText = `${item.name} (KES ${item.cost.toLocaleString()} if lost/damaged)`;
+        if (item.free) {
+            labelText += ` - ${item.freeNote}`;
+        }
+        itemsContainer.innerHTML += `
+            <label>
+                <input type="checkbox" value="${item.id}" class="requested-item" data-item-name="${item.name}">
+                ${labelText}
+            </label>
+        `;
+    });
+    
+    document.querySelectorAll('.requested-item').forEach(cb => {
+        cb.addEventListener('change', () => {
+            const blanketChecked = document.querySelector('.requested-item[value="blanket"]')?.checked;
+            const extraBlanketGroup = document.getElementById('extraBlanketGroup');
+            if (extraBlanketGroup) {
+                extraBlanketGroup.style.display = blanketChecked ? 'block' : 'none';
+                if (!blanketChecked) {
+                    document.getElementById('extraBlankets').value = 0;
+                }
+            }
+            calculateTotal();
+        });
+    });
+}
+
 function calculateTotal() {
     const roomType = document.getElementById('roomType')?.value;
     const checkIn = document.getElementById('checkIn')?.value;
@@ -114,17 +319,35 @@ function calculateTotal() {
     if (!roomType || !checkIn || !checkOut) return;
     
     const days = calculateDays(checkIn, checkOut);
-    const rate = roomRates[roomType];
-    const total = days * rate;
+    const rate = roomRates[roomType] || 500;
+    let total = days * rate;
+    
+    const blanketChecked = document.querySelector('.requested-item[value="blanket"]')?.checked;
+    let extraBlankets = 0;
+    let extraBlanketCost = 0;
+    
+    if (blanketChecked) {
+        extraBlankets = parseInt(document.getElementById('extraBlankets')?.value) || 0;
+        extraBlanketCost = extraBlankets * 10 * days;
+        total += extraBlanketCost;
+        
+        const extraBlanketRow = document.getElementById('extraBlanketRow');
+        if (extraBlanketRow) {
+            extraBlanketRow.style.display = 'block';
+            document.getElementById('extraBlanketCount').innerText = extraBlankets;
+            document.getElementById('extraBlanketCost').innerHTML = `KES ${extraBlanketCost.toLocaleString()}`;
+        }
+    } else {
+        const extraBlanketRow = document.getElementById('extraBlanketRow');
+        if (extraBlanketRow) extraBlanketRow.style.display = 'none';
+    }
     
     document.getElementById('roomRate').innerHTML = `KES ${rate.toLocaleString()}`;
     document.getElementById('totalDays').innerText = days;
-    document.getElementById('totalNights').innerText = days;
     document.getElementById('totalAmount').innerHTML = `KES ${total.toLocaleString()}`;
 }
 
-// Handle Booking Submission
-function handleBookingSubmit(e) {
+async function handleBookingSubmit(e) {
     e.preventDefault();
     
     const roomType = document.getElementById('roomType')?.value;
@@ -142,52 +365,76 @@ function handleBookingSubmit(e) {
     }
     
     const days = calculateDays(checkIn, checkOut);
-    const totalAmount = days * roomRates[roomType];
+    const rate = roomRates[roomType] || 500;
+    let totalAmount = days * rate;
     
-    // Get requested items
     const requestedItems = [];
     document.querySelectorAll('.requested-item:checked').forEach(cb => {
         const item = items.find(i => i.id === cb.value);
-        if (item) requestedItems.push(item);
+        if (item) {
+            requestedItems.push({
+                id: item.id,
+                name: item.name,
+                cost: item.cost
+            });
+        }
     });
     
-    const newBooking = {
-        id: generateBookingId(),
-        roomType,
-        roomName: roomNames[roomType],
-        guestName,
-        phone,
-        email: email || 'Not provided',
-        checkIn,
-        checkOut,
-        guests: parseInt(guests),
-        totalAmount,
-        transactionId,
-        requestedItems,
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-        itemsAssigned: false
-    };
+    let extraBlankets = 0;
+    const blanketChecked = document.querySelector('.requested-item[value="blanket"]')?.checked;
+    if (blanketChecked) {
+        extraBlankets = parseInt(document.getElementById('extraBlankets')?.value) || 0;
+        totalAmount += extraBlankets * 10 * days;
+    }
     
-    bookings.push(newBooking);
-    saveData();
+    const bookingId = generateBookingId();
     
-    alert(`✅ Booking Successful!\n\nBooking ID: ${newBooking.id}\nRoom: ${newBooking.roomName}\nTotal: KES ${totalAmount.toLocaleString()}\n\nPlease show this ID at check-in.`);
-    
-    document.getElementById('bookingForm')?.reset();
-    document.querySelectorAll('.room-card').forEach(c => c.classList.remove('selected'));
+    try {
+        // 1. Create guest
+        const guest = await createGuest({
+            name: guestName,
+            phone: phone,
+            email: email || null
+        });
+        
+        // 2. Create booking
+        await createBooking({
+            booking_id: bookingId,
+            room_id: roomType,
+            check_in: checkIn,
+            check_out: checkOut,
+            nights: days,
+            guests_count: parseInt(guests),
+            extra_blankets: extraBlankets,
+            total_amount: totalAmount,
+            transaction_id: transactionId
+        }, guest.id);
+        
+        // 3. Create booking items
+        await createBookingItems(bookingId, requestedItems);
+        
+        alert(`✅ Booking Successful!\n\nBooking ID: ${bookingId}\nRoom: ${roomData.find(r => r.id === roomType)?.name}\nNights: ${days}\nTotal: KES ${totalAmount.toLocaleString()}\n\nPlease show this ID at check-in.`);
+        
+        document.getElementById('bookingForm')?.reset();
+        document.querySelectorAll('.room-card').forEach(c => c.classList.remove('selected'));
+        document.getElementById('extraBlanketGroup').style.display = 'none';
+        
+    } catch (error) {
+        console.error('Booking error:', error);
+        alert('❌ Booking failed. Please try again.');
+    }
 }
 
 // ============ ADMIN FUNCTIONS ============
-
-// Update Admin Dashboard Stats
-function updateAdminStats() {
+async function updateAdminStats() {
+    await fetchBookings();
+    
     const totalBookings = bookings.length;
     const today = new Date().toISOString().split('T')[0];
     const todayCheckins = bookings.filter(b => b.checkIn === today && b.status === 'confirmed').length;
     const totalEarnings = bookings.filter(b => b.status === 'checked-out').reduce((sum, b) => sum + b.totalAmount, 0);
     const occupancyRate = bookings.filter(b => b.status === 'checked-in').length > 0 ? 
-        Math.min(100, (bookings.filter(b => b.status === 'checked-in').length / 4) * 100) : 0;
+        Math.min(100, (bookings.filter(b => b.status === 'checked-in').length / 5) * 100) : 0;
     
     document.getElementById('totalBookings').innerText = totalBookings;
     document.getElementById('todayCheckins').innerText = todayCheckins;
@@ -195,10 +442,11 @@ function updateAdminStats() {
     document.getElementById('occupancyRate').innerText = `${Math.round(occupancyRate)}%`;
 }
 
-// Load Bookings Table
-function loadBookingsTable(filter = 'all') {
+async function loadBookingsTable(filter = 'all') {
     const tbody = document.getElementById('bookingsTableBody');
     if (!tbody) return;
+    
+    await fetchBookings();
     
     let filteredBookings = bookings;
     if (filter !== 'all') {
@@ -231,92 +479,78 @@ function loadBookingsTable(filter = 'all') {
     });
 }
 
-// Confirm Booking
-function confirmBooking(id) {
-    const booking = bookings.find(b => b.id === id);
-    if (booking) {
-        booking.status = 'confirmed';
-        saveData();
-        loadBookingsTable();
-        updateAdminStats();
-        alert(`Booking ${id} confirmed!`);
-    }
+async function confirmBooking(id) {
+    await updateBookingStatus(id, 'confirmed');
+    await loadBookingsTable();
+    await updateAdminStats();
+    alert(`Booking ${id} confirmed!`);
 }
 
-// Check-in Guest
-function checkInGuest(id) {
-    const booking = bookings.find(b => b.id === id);
-    if (booking) {
-        booking.status = 'checked-in';
-        saveData();
-        loadBookingsTable();
-        updateAdminStats();
-        loadItemTracking();
-        alert(`${booking.guestName} has checked in!`);
-    }
+async function checkInGuest(id) {
+    await updateBookingStatus(id, 'checked-in');
+    await loadBookingsTable();
+    await updateAdminStats();
+    await loadItemTracking();
+    alert(`Guest checked in!`);
 }
 
-// Check-out Guest
-function checkOutGuest(id) {
+async function checkOutGuest(id) {
     const booking = bookings.find(b => b.id === id);
     if (booking && confirm(`Check out ${booking.guestName}?`)) {
-        booking.status = 'checked-out';
-        saveData();
-        loadBookingsTable();
-        updateAdminStats();
-        loadReports();
+        await updateBookingStatus(id, 'checked-out');
+        await loadBookingsTable();
+        await updateAdminStats();
+        await loadReports();
         alert(`${booking.guestName} checked out successfully!`);
     }
 }
 
-// Cancel Booking
-function cancelBooking(id) {
+async function cancelBooking(id) {
     if (confirm('Cancel this booking?')) {
-        const booking = bookings.find(b => b.id === id);
-        if (booking) {
-            booking.status = 'cancelled';
-            saveData();
-            loadBookingsTable();
-            updateAdminStats();
-            alert('Booking cancelled!');
-        }
+        await updateBookingStatus(id, 'cancelled');
+        await loadBookingsTable();
+        await updateAdminStats();
+        alert('Booking cancelled!');
     }
 }
 
-// Load Room Rates Editor
-function loadRoomRatesEditor() {
+async function loadRoomRatesEditor() {
     const container = document.getElementById('roomsEditGrid');
     if (!container) return;
     
+    await fetchRooms();
+    
     container.innerHTML = '';
-    for (const [key, rate] of Object.entries(roomRates)) {
+    roomData.forEach(room => {
+        const currentRate = roomRates[room.id] || room.price;
         container.innerHTML += `
             <div class="room-rate-edit">
-                <label>${roomNames[key]}</label>
-                <input type="number" id="rate_${key}" value="${rate}" class="rate-input">
-                <small>KES per day</small>
+                <label>${room.name}</label>
+                <input type="number" id="rate_${room.id}" value="${currentRate}" class="rate-input">
+                <small>KES per night</small>
             </div>
         `;
-    }
+    });
 }
 
-// Save Room Rates
-function saveRoomRates() {
-    for (const [key] of Object.entries(roomRates)) {
-        const newRate = parseInt(document.getElementById(`rate_${key}`)?.value);
-        if (newRate && !isNaN(newRate)) {
-            roomRates[key] = newRate;
+async function saveRoomRates() {
+    for (const room of roomData) {
+        const newRate = parseInt(document.getElementById(`rate_${room.id}`)?.value);
+        if (newRate && !isNaN(newRate) && newRate !== roomRates[room.id]) {
+            await updateRoomRate(room.id, newRate);
         }
     }
-    saveData();
     alert('Room rates updated successfully!');
-    if (typeof loadRoomsGrid === 'function') loadRoomsGrid();
+    await loadRoomsGrid();
 }
 
-// Load Item Tracking
-function loadItemTracking() {
+async function loadItemTracking() {
     const container = document.getElementById('itemTrackingContainer');
     if (!container) return;
+    
+    await fetchBookings();
+    await fetchItems();
+    await fetchItemAssignments();
     
     const checkedInGuests = bookings.filter(b => b.status === 'checked-in');
     
@@ -326,7 +560,7 @@ function loadItemTracking() {
     }
     
     container.innerHTML = '';
-    checkedInGuests.forEach(guest => {
+    for (const guest of checkedInGuests) {
         const guestAssignments = itemAssignments.filter(a => a.bookingId === guest.id);
         
         const guestDiv = document.createElement('div');
@@ -338,8 +572,8 @@ function loadItemTracking() {
                     const assigned = guestAssignments.find(a => a.itemId === item.id);
                     return `
                         <div class="item-row">
-                            <span>${item.name} (KES ${item.cost.toLocaleString()})</span>
-                            <select onchange="updateItemStatus('${guest.id}', '${item.id}', this.value)">
+                            <span>${item.name} (KES ${item.cost.toLocaleString()} if lost)</span>
+                            <select onchange="updateItemStatusUI('${guest.id}', '${item.id}', this.value)">
                                 <option value="not_assigned" ${!assigned ? 'selected' : ''}>Not Assigned</option>
                                 <option value="assigned" ${assigned?.status === 'assigned' ? 'selected' : ''}>Assigned</option>
                                 <option value="returned" ${assigned?.status === 'returned' ? 'selected' : ''}>Returned</option>
@@ -351,75 +585,60 @@ function loadItemTracking() {
             </div>
         `;
         container.appendChild(guestDiv);
-    });
+    }
 }
 
-// Update Item Status
-function updateItemStatus(bookingId, itemId, status) {
-    const item = items.find(i => i.id === itemId);
-    const existingIndex = itemAssignments.findIndex(a => a.bookingId === bookingId && a.itemId === itemId);
-    
-    if (status === 'not_assigned') {
-        if (existingIndex !== -1) itemAssignments.splice(existingIndex, 1);
-    } else {
-        const assignment = {
-            bookingId,
-            itemId,
-            itemName: item.name,
-            status,
-            cost: status === 'lost' ? item.cost : 0
-        };
-        
-        if (existingIndex !== -1) {
-            itemAssignments[existingIndex] = assignment;
-        } else {
-            itemAssignments.push(assignment);
-        }
-    }
-    
-    saveData();
-    loadLostItemsList();
-    loadReports();
+async function updateItemStatusUI(bookingId, itemId, status) {
+    await updateItemStatus(bookingId, itemId, status);
+    await loadLostItemsList();
+    await loadReports();
     alert(`Item status updated!`);
 }
 
-// Load Lost Items List
-function loadLostItemsList() {
+async function loadLostItemsList() {
     const container = document.getElementById('lostItemsList');
     if (!container) return;
     
+    await fetchItemAssignments();
+    await fetchBookings();
+    
     const lostItems = itemAssignments.filter(a => a.status === 'lost');
-    const totalLostCharges = lostItems.reduce((sum, item) => sum + item.cost, 0);
+    const totalLostCharges = lostItems.reduce((sum, item) => sum + (item.cost || 0), 0);
     
     if (lostItems.length === 0) {
-        container.innerHTML = '<p>No lost items reported.</p>';
+        container.innerHTML = '<p>No lost/damaged items reported.</p>';
         return;
     }
     
     container.innerHTML = `
-        <table class="lost-items-table">
+        <table class="lost-items-table" style="width:100%; border-collapse: collapse;">
             <thead>
-                <tr><th>Guest</th><th>Item</th><th>Charge (KES)</th></tr>
+                <tr><th style="padding: 0.5rem; text-align: left;">Guest</th><th style="padding: 0.5rem; text-align: left;">Item</th><th style="padding: 0.5rem; text-align: left;">Charge (KES)</th></tr>
             </thead>
             <tbody>
                 ${lostItems.map(item => {
                     const booking = bookings.find(b => b.id === item.bookingId);
                     return `
                         <tr>
-                            <td>${booking?.guestName || 'Unknown'}</td>
-                            <td>${item.itemName}</td>
-                            <td>KES ${item.cost.toLocaleString()}</td>
+                            <td style="padding: 0.5rem;">${booking?.guestName || 'Unknown'}</td>
+                            <td style="padding: 0.5rem;">${item.itemName}</td>
+                            <td style="padding: 0.5rem;">KES ${(item.cost || 0).toLocaleString()}</td>
                         </tr>
                     `;
                 }).join('')}
-                <tr class="total-row"><td colspan="2"><strong>Total Lost Items Charges</strong></td><td><strong>KES ${totalLostCharges.toLocaleString()}</strong></td></tr>
+                <tr style="font-weight: bold; border-top: 2px solid var(--border-color);">
+                    <td style="padding: 0.5rem;" colspan="2">Total Lost Items Charges</td>
+                    <td style="padding: 0.5rem;">KES ${totalLostCharges.toLocaleString()}</td>
+                </tr>
             </tbody>
         </table>
     `;
 }
 
-// Load Reports
-function loadReports() {
+async function loadReports() {
+    await fetchBookings();
+    await fetchItemAssignments();
+    
     const today = new Date().toISOString().split('T')[0];
     const todayEarnings = bookings.filter(b => b.checkOut === today && b.status === 'checked-out').reduce((sum, b) => sum + b.totalAmount, 0);
     
@@ -431,7 +650,7 @@ function loadReports() {
     monthAgo.setDate(monthAgo.getDate() - 30);
     const monthEarnings = bookings.filter(b => new Date(b.checkOut) >= monthAgo && b.status === 'checked-out').reduce((sum, b) => sum + b.totalAmount, 0);
     
-    const lostItemsTotal = itemAssignments.filter(a => a.status === 'lost').reduce((sum, a) => sum + a.cost, 0);
+    const lostItemsTotal = itemAssignments.filter(a => a.status === 'lost').reduce((sum, a) => sum + (a.cost || 0), 0);
     
     document.getElementById('todayEarnings').innerHTML = `KES ${todayEarnings.toLocaleString()}`;
     document.getElementById('weekEarnings').innerHTML = `KES ${weekEarnings.toLocaleString()}`;
@@ -457,8 +676,21 @@ function loadReports() {
 }
 
 // ============ INITIALIZATION ============
+function typeWriter(element, text, speed, callback) {
+    let i = 0;
+    element.innerHTML = '';
+    function type() {
+        if (i < text.length) {
+            element.innerHTML += text.charAt(i);
+            i++;
+            setTimeout(type, speed);
+        } else if (callback) {
+            callback();
+        }
+    }
+    type();
+}
 
-// Dark Mode Toggle
 function initDarkMode() {
     const themeToggle = document.getElementById('themeToggle');
     if (!themeToggle) return;
@@ -477,8 +709,7 @@ function initDarkMode() {
     });
 }
 
-// Admin Login
-function initAdminLogin() {
+async function initAdminLogin() {
     const loginOverlay = document.getElementById('loginOverlay');
     const dashboardContent = document.getElementById('dashboardContent');
     const loginBtn = document.getElementById('loginBtn');
@@ -490,19 +721,27 @@ function initAdminLogin() {
     if (isLoggedIn === 'true') {
         loginOverlay.style.display = 'none';
         dashboardContent.style.display = 'block';
-        loadAdminData();
+        await loadAdminData();
     }
     
     if (loginBtn) {
-        loginBtn.addEventListener('click', () => {
+        loginBtn.addEventListener('click', async () => {
             const password = document.getElementById('adminPassword')?.value;
-            if (password === 'admin254') {
+            const { data } = await supabase
+                .from('settings')
+                .select('setting_value')
+                .eq('setting_key', 'admin_password_hash')
+                .single();
+            
+            const correctPassword = data?.setting_value || 'admin254';
+            
+            if (password === correctPassword) {
                 sessionStorage.setItem('kag_admin_logged_in', 'true');
                 loginOverlay.style.display = 'none';
                 dashboardContent.style.display = 'block';
-                loadAdminData();
+                await loadAdminData();
             } else {
-                alert('Wrong password! Use: admin254');
+                alert('Wrong password!');
             }
         });
     }
@@ -515,15 +754,14 @@ function initAdminLogin() {
     }
 }
 
-function loadAdminData() {
-    updateAdminStats();
-    loadBookingsTable();
-    loadRoomRatesEditor();
-    loadItemTracking();
-    loadLostItemsList();
-    loadReports();
+async function loadAdminData() {
+    await updateAdminStats();
+    await loadBookingsTable();
+    await loadRoomRatesEditor();
+    await loadItemTracking();
+    await loadLostItemsList();
+    await loadReports();
     
-    // Tab switching
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -535,7 +773,6 @@ function loadAdminData() {
         });
     });
     
-    // Filter buttons
     document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
@@ -548,7 +785,6 @@ function loadAdminData() {
     if (saveRatesBtn) saveRatesBtn.addEventListener('click', saveRoomRates);
 }
 
-// Mobile Sidebar
 function initMobileSidebar() {
     const hamburger = document.getElementById('hamburger');
     const sidebar = document.getElementById('sidebar');
@@ -597,12 +833,37 @@ function initMobileSidebar() {
     }
 }
 
-// Page-specific initialization
+function initTypingAnimations() {
+    const typingElement = document.getElementById('typingText');
+    const canteenElement = document.getElementById('canteenText');
+    
+    if (typingElement) {
+        typeWriter(typingElement, 'Welcome to KAG Guest House', 100);
+    }
+    
+    if (canteenElement) {
+        setTimeout(() => {
+            typeWriter(canteenElement, '🍽️ Canteen Available on-site 🍽️', 80);
+        }, 2000);
+    }
+}
+
+function initExtraBlanketListener() {
+    const extraBlanketsInput = document.getElementById('extraBlankets');
+    if (extraBlanketsInput) {
+        extraBlanketsInput.addEventListener('change', calculateTotal);
+        extraBlanketsInput.addEventListener('input', calculateTotal);
+    }
+}
+
+// ============ PAGE INITIALIZATION ============
 if (document.getElementById('roomsGrid')) {
     // Guest page
-    loadRoomsGrid();
-    loadRoomOptions();
-    loadItemsCheckbox();
+    (async () => {
+        await loadRoomsGrid();
+        await loadRoomOptions();
+        await loadItemsCheckbox();
+    })();
     
     const checkIn = document.getElementById('checkIn');
     const checkOut = document.getElementById('checkOut');
@@ -614,6 +875,9 @@ if (document.getElementById('roomsGrid')) {
     
     const bookingForm = document.getElementById('bookingForm');
     if (bookingForm) bookingForm.addEventListener('submit', handleBookingSubmit);
+    
+    initExtraBlanketListener();
+    initTypingAnimations();
 }
 
 // Initialize all

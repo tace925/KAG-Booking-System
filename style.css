@@ -190,7 +190,7 @@ body {
     display: block;
 }
 
-/* Hero Section */
+/* Hero Section with Typing Animation */
 .hero {
     background: linear-gradient(135deg, var(--accent-color), var(--accent-dark));
     color: white;
@@ -198,14 +198,22 @@ body {
     text-align: center;
 }
 
-.hero-content h2 {
-    font-size: 2.5rem;
-    margin-bottom: 1rem;
+.typing-container {
+    min-height: 80px;
 }
 
-.hero-content .kag-highlight {
-    color: #ffd700;
-    font-size: inherit;
+.typing-container h2 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    display: inline-block;
+    border-right: 3px solid white;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+@keyframes blink {
+    0%, 100% { border-color: transparent; }
+    50% { border-color: white; }
 }
 
 .btn-primary {
@@ -386,6 +394,29 @@ body {
     margin: 0.5rem 0;
 }
 
+/* Bishop's Section */
+.bishop-section {
+    background: linear-gradient(135deg, #2c3e50, #1a1a2e);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    color: white;
+}
+
+.bishop-section i {
+    font-size: 2.5rem;
+    color: #ffd700;
+}
+
+.bishop-number {
+    font-size: 1.3rem;
+    font-weight: bold;
+    margin-top: 0.25rem;
+}
+
 /* Price Summary */
 .price-summary {
     background: var(--accent-color);
@@ -401,6 +432,11 @@ body {
 
 .summary-details p {
     margin: 0.5rem 0;
+}
+
+.summary-details i {
+    margin-left: 0.5rem;
+    cursor: help;
 }
 
 .total-price {
@@ -426,6 +462,24 @@ body {
 
 .btn-submit:hover {
     opacity: 0.9;
+}
+
+/* Canteen Animation */
+.canteen-animation {
+    text-align: center;
+    padding: 2rem;
+    background: var(--bg-secondary);
+    margin: 2rem 0;
+}
+
+.canteen-text {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--accent-color);
+    display: inline-block;
+    border-right: 2px solid var(--accent-color);
+    white-space: nowrap;
+    overflow: hidden;
 }
 
 /* Admin Dashboard Styles */
@@ -509,6 +563,7 @@ body {
     margin-bottom: 2rem;
     border-bottom: 1px solid var(--border-color);
     padding-bottom: 1rem;
+    flex-wrap: wrap;
 }
 
 .tab-btn {
@@ -574,6 +629,7 @@ body {
 .filter-buttons {
     display: flex;
     gap: 0.5rem;
+    flex-wrap: wrap;
 }
 
 .filter-btn {
@@ -587,6 +643,94 @@ body {
 .filter-btn.active {
     background: var(--accent-color);
     color: white;
+}
+
+.rooms-edit-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.room-rate-edit {
+    background: var(--card-bg);
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.room-rate-edit label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.rate-input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.btn-save {
+    background: var(--success);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.guest-items-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.item-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.item-row select {
+    padding: 0.25rem 0.5rem;
+    border-radius: 8px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.reports-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.report-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1rem;
+    text-align: center;
+}
+
+.current-guests {
+    margin-top: 2rem;
+}
+
+.guest-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
 }
 
 /* Footer */
@@ -632,5 +776,15 @@ body {
     
     .container {
         padding: 1rem;
+    }
+    
+    .typing-container h2 {
+        font-size: 1.5rem;
+        white-space: normal;
+    }
+    
+    .canteen-text {
+        font-size: 1rem;
+        white-space: normal;
     }
 }

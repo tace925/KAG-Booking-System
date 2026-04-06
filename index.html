@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
     <div class="app">
@@ -51,10 +52,12 @@
         <!-- Overlay -->
         <div class="overlay" id="overlay"></div>
 
-        <!-- Hero Section -->
+        <!-- Hero Section with Typing Animation -->
         <section class="hero">
             <div class="hero-content">
-                <h2>Welcome to <span class="kag-highlight">KAG</span> Guest House</h2>
+                <div class="typing-container">
+                    <h2 id="typingText"></h2>
+                </div>
                 <p>Find rest and peace in our comfortable accommodations</p>
                 <button class="btn-primary" id="heroBookBtn">Book a Room <i class="fas fa-arrow-right"></i></button>
             </div>
@@ -116,26 +119,33 @@
 
                         <!-- Items Request -->
                         <div class="form-group">
-                            <label><i class="fas fa-tshirt"></i> Request Items (Optional)</label>
+                            <label><i class="fas fa-tshirt"></i> Request Items</label>
                             <div class="items-checkbox-group" id="itemsCheckbox"></div>
-                            <small class="form-hint">You'll be charged if items are lost or damaged</small>
+                            <small class="form-hint">1 blanket is provided free. Extra blankets cost 10 KES/night each</small>
                         </div>
 
-                        <!-- Payment Section -->
+                        <!-- Extra Blanket Option -->
+                        <div class="form-group" id="extraBlanketGroup" style="display: none;">
+                            <label><i class="fas fa-blanket"></i> Extra Blankets (10 KES/night each)</label>
+                            <input type="number" id="extraBlankets" min="0" max="5" value="0">
+                            <small class="form-hint">Each extra blanket costs 10 KES per night of your stay</small>
+                        </div>
+
+                        <!-- Payment Section - M-Pesa Only -->
                         <div class="payment-section">
                             <h3><i class="fas fa-phone-alt"></i> M-Pesa Payment</h3>
                             <div class="payment-details">
                                 <div class="payment-card">
-                                    <i class="fas fa-building"></i>
-                                    <h4>Paybill Number</h4>
-                                    <p class="payment-number">123456</p>
-                                    <small>Account No: Your Name</small>
+                                    <i class="fas fa-mobile-alt"></i>
+                                    <h4>M-Pesa Number 1</h4>
+                                    <p class="payment-number">0704323654</p>
+                                    <small>Send payment via M-Pesa</small>
                                 </div>
                                 <div class="payment-card">
-                                    <i class="fas fa-store"></i>
-                                    <h4>Till/BuyGoods</h4>
-                                    <p class="payment-number">789012</p>
-                                    <small>For M-Pesa Buy Goods</small>
+                                    <i class="fas fa-mobile-alt"></i>
+                                    <h4>M-Pesa Number 2</h4>
+                                    <p class="payment-number">0704323654</p>
+                                    <small>Alternative number</small>
                                 </div>
                             </div>
                             <div class="form-group">
@@ -145,13 +155,24 @@
                             </div>
                         </div>
 
+                        <!-- Bishop's Number Section -->
+                        <div class="bishop-section">
+                            <i class="fas fa-church"></i>
+                            <div class="bishop-info">
+                                <h4>Bishop's Contact</h4>
+                                <p class="bishop-number">📞 0721514653</p>
+                                <small>For church matters and spiritual support</small>
+                            </div>
+                        </div>
+
                         <!-- Price Summary -->
                         <div class="price-summary" id="priceSummary">
                             <h3>Booking Summary</h3>
                             <div class="summary-details">
                                 <p>Room rate: <span id="roomRate">KES 0</span> <span id="ratePer">per day</span></p>
-                                <p>Number of days: <span id="totalDays">0</span></p>
-                                <p>Total nights: <span id="totalNights">0</span></p>
+                                <p>Number of nights: <span id="totalDays">0</span></p>
+                                <p>Free blanket: <span id="freeBlanket">1 included</span> <i class="fas fa-info-circle" title="1 blanket provided free per guest"></i></p>
+                                <p id="extraBlanketRow" style="display: none;">Extra blankets: <span id="extraBlanketCount">0</span> × 10 KES/night = <span id="extraBlanketCost">KES 0</span></p>
                                 <p class="total-price">Total Amount: <span id="totalAmount">KES 0</span></p>
                             </div>
                         </div>
@@ -164,10 +185,15 @@
             </div>
         </section>
 
+        <!-- Canteen Animation Section -->
+        <div class="canteen-animation">
+            <div class="canteen-text" id="canteenText"></div>
+        </div>
+
         <!-- Footer -->
         <footer class="footer">
             <div class="container">
-                <p>&copy; 2024 KAG - Kenya Assemblies of God Guest House. All rights reserved.</p>
+                <p>Crafted by Tevin Mulinge | 0743936403</p>
                 <p class="footer-verse">"Come to me, all you who are weary and burdened, and I will give you rest." - Matthew 11:28</p>
             </div>
         </footer>
