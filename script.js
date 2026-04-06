@@ -5,6 +5,21 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // Initialize Supabase client
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// ============ DEFAULT FALLBACK DATA ============
+const DEFAULT_ROOMS = [
+    { id: 'self_deluxe', name: 'Self-room (Deluxe)', price: 500, icon: 'fa-crown', display_order: 1 },
+    { id: 'self_comfort', name: 'Self-room (Comfort)', price: 400, icon: 'fa-star', display_order: 2 },
+    { id: 'self_economy', name: 'Self-room (Economy)', price: 350, icon: 'fa-bed', display_order: 3 },
+    { id: 'shared', name: 'Shared room', price: 200, icon: 'fa-users', display_order: 4 },
+    { id: 'dormitory', name: 'Dormitory', price: 100, icon: 'fa-bunk-bed', display_order: 5 }
+];
+
+const DEFAULT_ITEMS = [
+    { id: 'blanket', name: 'Blanket', cost: 500, free: true, freeNote: '1 free included' },
+    { id: 'bedsheet', name: 'Bedsheet', cost: 200, free: false, freeNote: null },
+    { id: 'mattress', name: 'Mattress', cost: 1000, free: false, freeNote: null }
+];
+
 // ============ GLOBAL VARIABLES ============
 let roomData = [];
 let items = [];
@@ -12,104 +27,158 @@ let bookings = [];
 let roomRates = {};
 let itemAssignments = [];
 
-// ============ FETCH DATA FROM SUPABASE ============
-async function fetchRooms() {
-    const { data, error } = await supabase
-        .from('rooms')
-        .select('*')
-        .order('display_order');
-    
-    if (error) {
-        console.error('Error fetching rooms:', error);
-        return [];
+// ============ HELPER FUNCTIONS ============
+function generateBookingId() {
+    return 'KAG' + Date.now() + Math.floor(Math.random() * 1000);
+}
+
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-KE');
+}
+
+function calculateDays(checkIn, checkOut) {
+    const start = new Date(checkIn);
+    const end = new Date(checkOut);
+    const diffTime = Math.abs(end - start);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 1;
+}
+
+function showLoading(elementId, show) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        if (show) {
+            element.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-pulse"></i> Loading...</div>';
+        }
     }
-    
-    roomData = data.map(room => ({
-        id: room.room_id,
-        name: room.name,
-        price: room.price,
-        icon: room.icon
-    }));
-    
-    // Update roomRates
-    roomData.forEach(room => {
-        roomRates[room.id] = room.price;
-    });
-    
-    return roomData;
+}
+
+// ============ FETCH DATA FROM SUPABASE WITH FALLBACKS ============
+async function fetchRooms() {
+    try {
+        showLoading('roomsGrid', true);
+        
+        const { data, error } = await supabase
+            .from('rooms')
+            .select('*')
+            .order('display_order');
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+            roomData = data.map(room => ({
+                id: room.room_id,
+                name: room.name,
+                price: room.price,
+                icon: room.icon
+            }));
+        } else {
+            console.log('No rooms in database, using defaults');
+            roomData = DEFAULT_ROOMS;
+        }
+        
+        // Update roomRates
+        roomData.forEach(room => {
+            roomRates[room.id] = room.price;
+        });
+        
+        return roomData;
+    } catch (error) {
+        console.error('Error fetching rooms:', error);
+        roomData = DEFAULT_ROOMS;
+        roomData.forEach(room => {
+            roomRates[room.id] = room.price;
+        });
+        return roomData;
+    }
 }
 
 async function fetchItems() {
-    const { data, error } = await supabase
-        .from('items')
-        .select('*');
-    
-    if (error) {
+    try {
+        const { data, error } = await supabase
+            .from('items')
+            .select('*');
+        
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+            items = data.map(item => ({
+                id: item.item_id,
+                name: item.name,
+                cost: item.replacement_cost,
+                free: item.is_free_item || false,
+                freeNote: item.is_free_item ? '1 free included' : undefined
+            }));
+        } else {
+            console.log('No items in database, using defaults');
+            items = DEFAULT_ITEMS;
+        }
+        
+        return items;
+    } catch (error) {
         console.error('Error fetching items:', error);
-        return [];
+        items = DEFAULT_ITEMS;
+        return items;
     }
-    
-    items = data.map(item => ({
-        id: item.item_id,
-        name: item.name,
-        cost: item.replacement_cost,
-        free: item.is_free_item,
-        freeNote: item.is_free_item ? '1 free included' : undefined
-    }));
-    
-    return items;
 }
 
 async function fetchBookings() {
-    const { data, error } = await supabase
-        .from('bookings')
-        .select('*, guests(*)');
-    
-    if (error) {
+    try {
+        const { data, error } = await supabase
+            .from('bookings')
+            .select('*, guests(*)');
+        
+        if (error) throw error;
+        
+        bookings = (data || []).map(booking => ({
+            id: booking.booking_id,
+            roomType: booking.room_id,
+            roomName: roomData.find(r => r.id === booking.room_id)?.name || 'Unknown',
+            guestName: booking.guests?.name || 'Unknown',
+            phone: booking.guests?.phone || '',
+            email: booking.guests?.email || 'Not provided',
+            checkIn: booking.check_in,
+            checkOut: booking.check_out,
+            guests: booking.guests_count,
+            totalAmount: booking.total_amount,
+            transactionId: booking.transaction_id,
+            extraBlankets: booking.extra_blankets || 0,
+            nights: booking.nights,
+            status: booking.status,
+            createdAt: booking.created_at
+        }));
+        
+        return bookings;
+    } catch (error) {
         console.error('Error fetching bookings:', error);
-        return [];
+        bookings = [];
+        return bookings;
     }
-    
-    bookings = data.map(booking => ({
-        id: booking.booking_id,
-        roomType: booking.room_id,
-        roomName: roomData.find(r => r.id === booking.room_id)?.name || 'Unknown',
-        guestName: booking.guests?.name || 'Unknown',
-        phone: booking.guests?.phone || '',
-        email: booking.guests?.email || 'Not provided',
-        checkIn: booking.check_in,
-        checkOut: booking.check_out,
-        guests: booking.guests_count,
-        totalAmount: booking.total_amount,
-        transactionId: booking.transaction_id,
-        extraBlankets: booking.extra_blankets || 0,
-        nights: booking.nights,
-        status: booking.status,
-        createdAt: booking.created_at
-    }));
-    
-    return bookings;
 }
 
 async function fetchItemAssignments() {
-    const { data, error } = await supabase
-        .from('booking_items')
-        .select('*');
-    
-    if (error) {
+    try {
+        const { data, error } = await supabase
+            .from('booking_items')
+            .select('*');
+        
+        if (error) throw error;
+        
+        itemAssignments = (data || []).map(assignment => ({
+            bookingId: assignment.booking_id,
+            itemId: assignment.item_id,
+            itemName: items.find(i => i.id === assignment.item_id)?.name || '',
+            status: assignment.status,
+            cost: assignment.status === 'lost' ? (items.find(i => i.id === assignment.item_id)?.cost || 0) : 0
+        }));
+        
+        return itemAssignments;
+    } catch (error) {
         console.error('Error fetching item assignments:', error);
-        return [];
+        itemAssignments = [];
+        return itemAssignments;
     }
-    
-    itemAssignments = data.map(assignment => ({
-        bookingId: assignment.booking_id,
-        itemId: assignment.item_id,
-        itemName: items.find(i => i.id === assignment.item_id)?.name || '',
-        status: assignment.status,
-        cost: assignment.status === 'lost' ? (items.find(i => i.id === assignment.item_id)?.cost || 0) : 0
-    }));
-    
-    return itemAssignments;
 }
 
 // ============ SAVE DATA TO SUPABASE ============
@@ -119,7 +188,7 @@ async function createGuest(guestData) {
         .insert([{
             name: guestData.name,
             phone: guestData.phone,
-            email: guestData.email
+            email: guestData.email || null
         }])
         .select()
         .single();
@@ -152,6 +221,8 @@ async function createBooking(bookingData, guestId) {
 }
 
 async function createBookingItems(bookingId, requestedItems) {
+    if (!requestedItems || requestedItems.length === 0) return;
+    
     for (const item of requestedItems) {
         const { error } = await supabase
             .from('booking_items')
@@ -174,14 +245,14 @@ async function updateBookingStatus(bookingId, status) {
     if (error) throw error;
 }
 
-async function updateItemStatus(bookingId, itemId, status) {
+async function updateItemStatusSupabase(bookingId, itemId, status) {
     // Check if assignment exists
     const { data: existing } = await supabase
         .from('booking_items')
         .select('*')
         .eq('booking_id', bookingId)
         .eq('item_id', itemId)
-        .single();
+        .maybeSingle();
     
     if (existing) {
         const { error } = await supabase
@@ -217,28 +288,12 @@ async function updateRoomRate(roomId, newRate) {
     roomRates[roomId] = newRate;
 }
 
-// ============ HELPER FUNCTIONS (same as before) ============
-function generateBookingId() {
-    return 'KAG' + Date.now() + Math.floor(Math.random() * 1000);
-}
-
-function formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-KE');
-}
-
-function calculateDays(checkIn, checkOut) {
-    const start = new Date(checkIn);
-    const end = new Date(checkOut);
-    const diffTime = Math.abs(end - start);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays > 0 ? diffDays : 1;
-}
-
-// ============ LOAD ROOMS GRID (Guest Page) ============
+// ============ LOAD FUNCTIONS (GUEST PAGE) ============
 async function loadRoomsGrid() {
     const roomsGrid = document.getElementById('roomsGrid');
     if (!roomsGrid) return;
+    
+    roomsGrid.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-pulse"></i> Loading rooms...</div>';
     
     await fetchRooms();
     
@@ -256,7 +311,8 @@ async function loadRoomsGrid() {
         roomCard.onclick = () => {
             document.querySelectorAll('.room-card').forEach(c => c.classList.remove('selected'));
             roomCard.classList.add('selected');
-            document.getElementById('roomType').value = room.id;
+            const roomSelect = document.getElementById('roomType');
+            if (roomSelect) roomSelect.value = room.id;
             calculateTotal();
         };
         roomsGrid.appendChild(roomCard);
@@ -279,6 +335,8 @@ async function loadRoomOptions() {
 async function loadItemsCheckbox() {
     const itemsContainer = document.getElementById('itemsCheckbox');
     if (!itemsContainer) return;
+    
+    itemsContainer.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner fa-pulse"></i> Loading items...</div>';
     
     await fetchItems();
     
@@ -303,7 +361,8 @@ async function loadItemsCheckbox() {
             if (extraBlanketGroup) {
                 extraBlanketGroup.style.display = blanketChecked ? 'block' : 'none';
                 if (!blanketChecked) {
-                    document.getElementById('extraBlankets').value = 0;
+                    const extraBlankets = document.getElementById('extraBlankets');
+                    if (extraBlankets) extraBlankets.value = 0;
                 }
             }
             calculateTotal();
@@ -342,9 +401,13 @@ function calculateTotal() {
         if (extraBlanketRow) extraBlanketRow.style.display = 'none';
     }
     
-    document.getElementById('roomRate').innerHTML = `KES ${rate.toLocaleString()}`;
-    document.getElementById('totalDays').innerText = days;
-    document.getElementById('totalAmount').innerHTML = `KES ${total.toLocaleString()}`;
+    const roomRateSpan = document.getElementById('roomRate');
+    const totalDaysSpan = document.getElementById('totalDays');
+    const totalAmountSpan = document.getElementById('totalAmount');
+    
+    if (roomRateSpan) roomRateSpan.innerHTML = `KES ${rate.toLocaleString()}`;
+    if (totalDaysSpan) totalDaysSpan.innerText = days;
+    if (totalAmountSpan) totalAmountSpan.innerHTML = `KES ${total.toLocaleString()}`;
 }
 
 async function handleBookingSubmit(e) {
@@ -390,6 +453,12 @@ async function handleBookingSubmit(e) {
     const bookingId = generateBookingId();
     
     try {
+        const submitBtn = document.querySelector('.btn-submit');
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Processing...';
+        }
+        
         // 1. Create guest
         const guest = await createGuest({
             name: guestName,
@@ -417,11 +486,18 @@ async function handleBookingSubmit(e) {
         
         document.getElementById('bookingForm')?.reset();
         document.querySelectorAll('.room-card').forEach(c => c.classList.remove('selected'));
-        document.getElementById('extraBlanketGroup').style.display = 'none';
+        const extraBlanketGroup = document.getElementById('extraBlanketGroup');
+        if (extraBlanketGroup) extraBlanketGroup.style.display = 'none';
         
     } catch (error) {
         console.error('Booking error:', error);
         alert('❌ Booking failed. Please try again.');
+    } finally {
+        const submitBtn = document.querySelector('.btn-submit');
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-check-circle"></i> Complete Booking';
+        }
     }
 }
 
@@ -436,10 +512,15 @@ async function updateAdminStats() {
     const occupancyRate = bookings.filter(b => b.status === 'checked-in').length > 0 ? 
         Math.min(100, (bookings.filter(b => b.status === 'checked-in').length / 5) * 100) : 0;
     
-    document.getElementById('totalBookings').innerText = totalBookings;
-    document.getElementById('todayCheckins').innerText = todayCheckins;
-    document.getElementById('totalEarnings').innerHTML = `KES ${totalEarnings.toLocaleString()}`;
-    document.getElementById('occupancyRate').innerText = `${Math.round(occupancyRate)}%`;
+    const totalBookingsEl = document.getElementById('totalBookings');
+    const todayCheckinsEl = document.getElementById('todayCheckins');
+    const totalEarningsEl = document.getElementById('totalEarnings');
+    const occupancyRateEl = document.getElementById('occupancyRate');
+    
+    if (totalBookingsEl) totalBookingsEl.innerText = totalBookings;
+    if (todayCheckinsEl) todayCheckinsEl.innerText = todayCheckins;
+    if (totalEarningsEl) totalEarningsEl.innerHTML = `KES ${totalEarnings.toLocaleString()}`;
+    if (occupancyRateEl) occupancyRateEl.innerText = `${Math.round(occupancyRate)}%`;
 }
 
 async function loadBookingsTable(filter = 'all') {
@@ -589,7 +670,7 @@ async function loadItemTracking() {
 }
 
 async function updateItemStatusUI(bookingId, itemId, status) {
-    await updateItemStatus(bookingId, itemId, status);
+    await updateItemStatusSupabase(bookingId, itemId, status);
     await loadLostItemsList();
     await loadReports();
     alert(`Item status updated!`);
@@ -611,7 +692,7 @@ async function loadLostItemsList() {
     }
     
     container.innerHTML = `
-        <table class="lost-items-table" style="width:100%; border-collapse: collapse;">
+        <table style="width:100%; border-collapse: collapse;">
             <thead>
                 <tr><th style="padding: 0.5rem; text-align: left;">Guest</th><th style="padding: 0.5rem; text-align: left;">Item</th><th style="padding: 0.5rem; text-align: left;">Charge (KES)</th></tr>
             </thead>
@@ -652,10 +733,15 @@ async function loadReports() {
     
     const lostItemsTotal = itemAssignments.filter(a => a.status === 'lost').reduce((sum, a) => sum + (a.cost || 0), 0);
     
-    document.getElementById('todayEarnings').innerHTML = `KES ${todayEarnings.toLocaleString()}`;
-    document.getElementById('weekEarnings').innerHTML = `KES ${weekEarnings.toLocaleString()}`;
-    document.getElementById('monthEarnings').innerHTML = `KES ${monthEarnings.toLocaleString()}`;
-    document.getElementById('lostItemsTotal').innerHTML = `KES ${lostItemsTotal.toLocaleString()}`;
+    const todayEarningsEl = document.getElementById('todayEarnings');
+    const weekEarningsEl = document.getElementById('weekEarnings');
+    const monthEarningsEl = document.getElementById('monthEarnings');
+    const lostItemsTotalEl = document.getElementById('lostItemsTotal');
+    
+    if (todayEarningsEl) todayEarningsEl.innerHTML = `KES ${todayEarnings.toLocaleString()}`;
+    if (weekEarningsEl) weekEarningsEl.innerHTML = `KES ${weekEarnings.toLocaleString()}`;
+    if (monthEarningsEl) monthEarningsEl.innerHTML = `KES ${monthEarnings.toLocaleString()}`;
+    if (lostItemsTotalEl) lostItemsTotalEl.innerHTML = `KES ${lostItemsTotal.toLocaleString()}`;
     
     const currentGuests = bookings.filter(b => b.status === 'checked-in');
     const guestsContainer = document.getElementById('currentGuestsList');
@@ -675,7 +761,7 @@ async function loadReports() {
     }
 }
 
-// ============ INITIALIZATION ============
+// ============ TYPING ANIMATION ============
 function typeWriter(element, text, speed, callback) {
     let i = 0;
     element.innerHTML = '';
@@ -691,6 +777,25 @@ function typeWriter(element, text, speed, callback) {
     type();
 }
 
+async function initTypingAnimations() {
+    const typingElement = document.getElementById('typingText');
+    const canteenElement = document.getElementById('canteenText');
+    
+    // Wait a bit for page to load
+    setTimeout(() => {
+        if (typingElement) {
+            typeWriter(typingElement, 'Welcome to KAG Guest House', 100);
+        }
+    }, 500);
+    
+    setTimeout(() => {
+        if (canteenElement) {
+            typeWriter(canteenElement, '🍽️ Canteen Available on-site 🍽️', 80);
+        }
+    }, 3000);
+}
+
+// ============ DARK MODE (FIXED) ============
 function initDarkMode() {
     const themeToggle = document.getElementById('themeToggle');
     if (!themeToggle) return;
@@ -699,6 +804,8 @@ function initDarkMode() {
     if (savedTheme === 'dark') {
         document.body.classList.add('dark');
         themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+    } else {
+        themeToggle.innerHTML = '<i class="fas fa-moon"></i>';
     }
     
     themeToggle.addEventListener('click', () => {
@@ -709,6 +816,7 @@ function initDarkMode() {
     });
 }
 
+// ============ ADMIN LOGIN ============
 async function initAdminLogin() {
     const loginOverlay = document.getElementById('loginOverlay');
     const dashboardContent = document.getElementById('dashboardContent');
@@ -727,13 +835,21 @@ async function initAdminLogin() {
     if (loginBtn) {
         loginBtn.addEventListener('click', async () => {
             const password = document.getElementById('adminPassword')?.value;
-            const { data } = await supabase
-                .from('settings')
-                .select('setting_value')
-                .eq('setting_key', 'admin_password_hash')
-                .single();
             
-            const correctPassword = data?.setting_value || 'admin254';
+            let correctPassword = 'admin254';
+            try {
+                const { data } = await supabase
+                    .from('settings')
+                    .select('setting_value')
+                    .eq('setting_key', 'admin_password_hash')
+                    .maybeSingle();
+                
+                if (data?.setting_value) {
+                    correctPassword = data.setting_value;
+                }
+            } catch (error) {
+                console.log('Using default password');
+            }
             
             if (password === correctPassword) {
                 sessionStorage.setItem('kag_admin_logged_in', 'true');
@@ -767,7 +883,8 @@ async function loadAdminData() {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
             btn.classList.add('active');
-            document.getElementById(`${btn.dataset.tab}Tab`).classList.add('active');
+            const tabContent = document.getElementById(`${btn.dataset.tab}Tab`);
+            if (tabContent) tabContent.classList.add('active');
             if (btn.dataset.tab === 'items') loadItemTracking();
             if (btn.dataset.tab === 'reports') loadReports();
         });
@@ -785,6 +902,7 @@ async function loadAdminData() {
     if (saveRatesBtn) saveRatesBtn.addEventListener('click', saveRoomRates);
 }
 
+// ============ MOBILE SIDEBAR ============
 function initMobileSidebar() {
     const hamburger = document.getElementById('hamburger');
     const sidebar = document.getElementById('sidebar');
@@ -813,7 +931,8 @@ function initMobileSidebar() {
     if (scrollToRooms) {
         scrollToRooms.addEventListener('click', (e) => {
             e.preventDefault();
-            document.getElementById('roomsSection')?.scrollIntoView({ behavior: 'smooth' });
+            const roomsSection = document.getElementById('roomsSection');
+            if (roomsSection) roomsSection.scrollIntoView({ behavior: 'smooth' });
             closeSidebarFunc();
         });
     }
@@ -821,30 +940,17 @@ function initMobileSidebar() {
     if (scrollToBooking) {
         scrollToBooking.addEventListener('click', (e) => {
             e.preventDefault();
-            document.getElementById('bookingSection')?.scrollIntoView({ behavior: 'smooth' });
+            const bookingSection = document.getElementById('bookingSection');
+            if (bookingSection) bookingSection.scrollIntoView({ behavior: 'smooth' });
             closeSidebarFunc();
         });
     }
     
     if (heroBookBtn) {
         heroBookBtn.addEventListener('click', () => {
-            document.getElementById('bookingSection')?.scrollIntoView({ behavior: 'smooth' });
+            const bookingSection = document.getElementById('bookingSection');
+            if (bookingSection) bookingSection.scrollIntoView({ behavior: 'smooth' });
         });
-    }
-}
-
-function initTypingAnimations() {
-    const typingElement = document.getElementById('typingText');
-    const canteenElement = document.getElementById('canteenText');
-    
-    if (typingElement) {
-        typeWriter(typingElement, 'Welcome to KAG Guest House', 100);
-    }
-    
-    if (canteenElement) {
-        setTimeout(() => {
-            typeWriter(canteenElement, '🍽️ Canteen Available on-site 🍽️', 80);
-        }, 2000);
     }
 }
 
@@ -856,6 +962,14 @@ function initExtraBlanketListener() {
     }
 }
 
+// ============ SET MINIMUM DATES ============
+function setMinDates() {
+    const today = new Date().toISOString().split('T')[0];
+    document.querySelectorAll('input[type="date"]').forEach(input => {
+        if (!input.value) input.min = today;
+    });
+}
+
 // ============ PAGE INITIALIZATION ============
 if (document.getElementById('roomsGrid')) {
     // Guest page
@@ -863,6 +977,7 @@ if (document.getElementById('roomsGrid')) {
         await loadRoomsGrid();
         await loadRoomOptions();
         await loadItemsCheckbox();
+        setMinDates();
     })();
     
     const checkIn = document.getElementById('checkIn');
@@ -884,9 +999,3 @@ if (document.getElementById('roomsGrid')) {
 initDarkMode();
 initAdminLogin();
 initMobileSidebar();
-
-// Set minimum date for date inputs
-const today = new Date().toISOString().split('T')[0];
-document.querySelectorAll('input[type="date"]').forEach(input => {
-    if (!input.value) input.min = today;
-});
