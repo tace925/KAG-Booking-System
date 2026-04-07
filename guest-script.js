@@ -1,5 +1,10 @@
 // ==================== GUEST SCRIPT ====================
-const supabase = getSupabase();
+const supabase = window.getSupabase ? getSupabase() : null;
+
+if (!supabase) {
+    console.error("Supabase client not found!");
+}
+
 
 // Default data...
 const DEFAULT_ROOMS = [ /* same as you have */ ];

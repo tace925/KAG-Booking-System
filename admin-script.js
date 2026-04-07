@@ -1,5 +1,9 @@
-// ==================== ADMIN SCRIPT (FIXED & COMPLETE) ====================
-const supabase = getSupabase();
+// ==================== ADMIN SCRIPT ====================
+const supabase = window.getSupabase ? getSupabase() : null;
+
+if (!supabase) {
+    console.error("Supabase client not found!");
+}
 
 let bookings = [];
 let itemAssignments = [];
