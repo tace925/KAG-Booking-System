@@ -292,22 +292,24 @@ async function handleBookingSubmit(e) {
         if (guestError) throw new Error(`Guest save failed: ${guestError.message}`);
         
         // 2. Insert booking
-        const { error: bookingError } = await supabaseClient
-            .from('bookings')
-            .insert([{
-                booking_id: bookingId,
-                guest_id: guestIdNum,
-                room_id: roomType,
-                check_in: checkIn,
-                check_out: checkOut,
-                nights: days,
-                guests_count: guests,
-                total_amount: totalAmount,
-                transaction_id: transactionId,
-                extra_blankets: extraBlankets,
-                status: 'pending',
-                created_at: new Date().toISOString()
-            }]);
+       const { error: bookingError } = await supabaseClient
+    .from('bookings')
+    .insert([{
+        booking_id: bookingId,
+        guest_id: guestIdNum,
+        room_id: roomType,
+        check_in: checkIn,
+        check_out: checkOut,
+        nights: days,
+        guests_count: guests,
+        total_amount: totalAmount,
+        transaction_id: transactionId,
+        extra_blankets: extraBlankets,
+        guest_name: guestName,      // ← ADD THIS
+        guest_phone: phone,          // ← ADD THIS
+        status: 'pending',
+        created_at: new Date().toISOString()
+    }]);
         
         if (bookingError) throw new Error(`Booking save failed: ${bookingError.message}`);
         
@@ -364,12 +366,13 @@ function initTypingAnimations() {
     const canteenElement = document.getElementById('canteenText');
     
     if (typingElement) {
-        const phrases = [
-            "Welcome to KAG Guest House",
-            "Find rest and peace",
-            "Comfortable accommodations",
-            "Book your stay today"
-        ];
+       // TO:
+const phrases = [
+    "Welcome to Katoloni Prayer Center",
+    "Find rest and peace",
+    "Comfortable accommodations",
+    "Book your stay today"
+];
         let phraseIndex = 0;
         
         function typeNext() {
@@ -512,7 +515,7 @@ async function loadBookingsTable(filter = 'all') {
         const row = tbody.insertRow();
         row.innerHTML = `
             <td>${b.booking_id}</td>
-            <td>${b.guests?.name || 'Unknown'}<br><small>${b.guests?.phone || 'N/A'}</small></td>
+           <td>${b.guest_name || 'Unknown'}<br><small>${b.guest_phone || 'N/A'}</small></td>
             <td>${roomData.find(r => r.room_id === b.room_id)?.name || b.room_id}</td>
             <td>${formatDate(b.check_in)}</td>
             <td>${formatDate(b.check_out)}</td>
