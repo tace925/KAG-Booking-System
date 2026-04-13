@@ -816,8 +816,8 @@ async function loadAdminData() {
     });
     
    document.getElementById('saveRoomRates')?.addEventListener('click', saveRoomRates);
-await loadReports();
-
+    await loadReports();
+}
 // ==================== INITIALIZATION ====================
 function init() {
     console.log('🚀 KAG Guest House initializing...');
