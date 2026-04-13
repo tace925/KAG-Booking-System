@@ -541,6 +541,33 @@ async function updateBookingStatus(bookingId, status) {
             .eq('booking_id', bookingId);
         
         if (error) throw error;
+
+        // ✅ INSERT INTO PAYMENTS when checked-out
+        if (status === 'checked-out') {
+            // First get the booking total
+            const { data: booking, error: fetchError } = await supabaseClient
+                .from('bookings')
+                .select('total_amount')
+                .eq('booking_id', bookingId)
+                .single();
+
+            if (!fetchError && booking) {
+                const { error: paymentError } = await supabaseClient
+                    .from('payments')
+                    .insert({
+                        booking_id: bookingId,
+                        amount: booking.total_amount,
+                        transaction_id: 'TXN-' + Date.now(),
+                        payment_date: new Date().toISOString()
+                    });
+
+                if (paymentError) {
+                    console.error('Payment record failed:', paymentError.message);
+                } else {
+                    console.log('✅ Payment recorded successfully');
+                }
+            }
+        }
         
         alert(`Booking ${bookingId} updated to: ${status}`);
         await loadBookingsTable();
