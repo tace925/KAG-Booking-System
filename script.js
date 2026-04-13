@@ -80,6 +80,64 @@ const { data, error } = await supabaseClient
         console.error('❌ Failed to fetch bookings:', err);
         return [];
     }
+} 
+
+// ==================== REPORTS ====================
+async function loadReports() {
+    const container = document.getElementById('reportsTab');
+    if (!container) return;
+
+    const allBookings = await fetchBookingsFromSupabase();
+    const checkedOut = allBookings.filter(b => b.status === 'checked-out');
+
+    const today = new Date().toISOString().split('T')[0];
+
+    // Get start of this week (Monday)
+    const now = new Date();
+    const dayOfWeek = now.getDay() || 7;
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - dayOfWeek + 1);
+    const weekStart = startOfWeek.toISOString().split('T')[0];
+
+    // Get start of this month
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+
+    // Calculate earnings
+    const todayEarnings = checkedOut
+        .filter(b => b.created_at?.split('T')[0] === today)
+        .reduce((sum, b) => sum + (b.total_amount || 0), 0);
+
+    const weekEarnings = checkedOut
+        .filter(b => b.created_at?.split('T')[0] >= weekStart)
+        .reduce((sum, b) => sum + (b.total_amount || 0), 0);
+
+    const monthEarnings = checkedOut
+        .filter(b => b.created_at?.split('T')[0] >= monthStart)
+        .reduce((sum, b) => sum + (b.total_amount || 0), 0);
+
+    // Update UI
+    document.getElementById('todayEarnings') && 
+        (document.getElementById('todayEarnings').innerText = `KES ${todayEarnings.toLocaleString()}`);
+    document.getElementById('weekEarnings') && 
+        (document.getElementById('weekEarnings').innerText = `KES ${weekEarnings.toLocaleString()}`);
+    document.getElementById('monthEarnings') && 
+        (document.getElementById('monthEarnings').innerText = `KES ${monthEarnings.toLocaleString()}`);
+
+    // Current guests list
+    const currentGuests = allBookings.filter(b => b.status === 'checked-in');
+    const guestsContainer = document.getElementById('currentGuestsList');
+    if (guestsContainer) {
+        if (currentGuests.length === 0) {
+            guestsContainer.innerHTML = '<p style="color:#aaa;">No guests currently checked in.</p>';
+        } else {
+            guestsContainer.innerHTML = currentGuests.map(b => `
+                <div style="background:#1a1a1a; border:1px solid #333; border-radius:8px; padding:1rem; margin-bottom:0.5rem;">
+                    <p><strong>👤 ${b.guest_name}</strong> — ${b.room_id}</p>
+                    <p style="color:#aaa; font-size:0.85rem;">Check-out: ${b.check_out} | KES ${(b.total_amount||0).toLocaleString()}</p>
+                </div>
+            `).join('');
+        }
+    }
 }
 
 // ==================== UI LOADING FUNCTIONS ====================
@@ -757,8 +815,8 @@ async function loadAdminData() {
         });
     });
     
-    document.getElementById('saveRoomRates')?.addEventListener('click', saveRoomRates);
-}
+   document.getElementById('saveRoomRates')?.addEventListener('click', saveRoomRates);
+await loadReports();
 
 // ==================== INITIALIZATION ====================
 function init() {
