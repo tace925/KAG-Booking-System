@@ -862,3 +862,9 @@ if (document.readyState === 'loading') {
 // Make functions available globally for HTML onclick
 window.updateBookingStatus = updateBookingStatus;
 window.searchBookingByName = searchBookingByName;
+// At the very end of script.js, expose supabase globally
+window.supabase = supabase;
+console.log('✅ Supabase client exposed to window globally');
+
+// Also dispatch an event when supabase is ready
+window.dispatchEvent(new Event('supabaseReady'));

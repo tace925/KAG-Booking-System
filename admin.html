@@ -115,88 +115,36 @@
                 </div>
             </div>
 
-            
+            <!-- Reports Tab -->
+            <div class="tab-content" id="reportsTab">
+                <h3><i class="fas fa-chart-line"></i> Financial Reports</h3>
+                <div class="reports-grid">
+                    <div class="report-card">
+                        <h4>Today's Earnings</h4>
+                        <p id="todayEarnings">KES 0</p>
+                    </div>
+                    <div class="report-card">
+                        <h4>This Week's Earnings</h4>
+                        <p id="weekEarnings">KES 0</p>
+                    </div>
+                    <div class="report-card">
+                        <h4>This Month's Earnings</h4>
+                        <p id="monthEarnings">KES 0</p>
+                    </div>
+                    <div class="report-card">
+                        <h4>Lost Items Charges</h4>
+                        <p id="lostItemsTotal">KES 0</p>
+                    </div>
+                </div>
+                <div class="current-guests">
+                    <h4><i class="fas fa-users"></i> Current Guests</h4>
+                    <div id="currentGuestsList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="script.js"></script>
-<script>
-    // ==================== DASHBOARD STATS LOADER ====================
-    async function loadDashboardStats() {
-        try {
-            // Stronger check - wait until supabase is fully ready
-            if (typeof supabase === 'undefined' || typeof supabase.from !== 'function') {
-                console.warn('⏳ Supabase not ready yet, retrying in 1 second...');
-                setTimeout(loadDashboardStats, 1000);
-                return;
-            }
-
-            console.log('🔄 Loading dashboard stats...');
-
-            // Total Bookings
-            const { count: totalBookings } = await supabase
-                .from('bookings')
-                .select('*', { count: 'exact', head: true });
-
-            document.getElementById('totalBookings').textContent = totalBookings || 0;
-
-            // Today's Check-ins
-            const today = new Date().toISOString().split('T')[0];
-            const { count: todayCheckins } = await supabase
-                .from('bookings')
-                .select('*', { count: 'exact', head: true })
-                .eq('check_in_date', today)
-                .eq('status', 'checked-in');
-
-            document.getElementById('todayCheckins').textContent = todayCheckins || 0;
-
-            // Total Earnings
-            const { data: payments } = await supabase
-                .from('payments')
-                .select('amount');
-
-            const totalEarnings = payments ? payments.reduce((sum, p) => sum + Number(p.amount || 0), 0) : 0;
-            document.getElementById('totalEarnings').textContent = `KES ${totalEarnings.toLocaleString()}`;
-
-            // Occupancy Rate
-            const { count: totalRooms } = await supabase
-                .from('rooms')
-                .select('*', { count: 'exact', head: true });
-
-            const { count: occupiedRooms } = await supabase
-                .from('bookings')
-                .select('*', { count: 'exact', head: true })
-                .eq('status', 'checked-in');
-
-            const occupancy = totalRooms && totalRooms > 0 
-                ? Math.round((occupiedRooms / totalRooms) * 100) 
-                : 0;
-            document.getElementById('occupancyRate').textContent = `${occupancy}%`;
-
-            console.log('✅ Dashboard stats loaded successfully!');
-
-        } catch (error) {
-            console.error('❌ Error loading dashboard stats:', error);
-        }
-    }
-
-    // Run when dashboard is visible
-    document.addEventListener('DOMContentLoaded', () => {
-        const dashboard = document.getElementById('dashboardContent');
-        
-        const waitForLogin = setInterval(() => {
-            if (dashboard && dashboard.style.display !== 'none') {
-                clearInterval(waitForLogin);
-                loadDashboardStats();
-            }
-        }, 800);
-    });
-
-    // Auto-refresh every 25 seconds
-    setInterval(() => {
-        const dashboard = document.getElementById('dashboardContent');
-        if (dashboard && dashboard.style.display !== 'none') {
-            loadDashboardStats();
-        }
-    }, 25000);
-</script>
 </body>
 </html>
