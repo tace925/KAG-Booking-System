@@ -118,5 +118,84 @@
             
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="script.js"></script>
+<script>
+    // ==================== DASHBOARD STATS LOADER ====================
+    async function loadDashboardStats() {
+        try {
+            if (typeof supabase === 'undefined') {
+                console.error('Supabase client not found. Make sure script.js loaded first.');
+                return;
+            }
+
+            console.log('🔄 Loading dashboard stats...');
+
+            // 1. Total Bookings
+            const { count: totalBookings } = await supabase
+                .from('bookings')
+                .select('*', { count: 'exact', head: true });
+
+            document.getElementById('totalBookings').textContent = totalBookings || 0;
+
+            // 2. Today's Check-ins
+            const today = new Date().toISOString().split('T')[0];
+            const { count: todayCheckins } = await supabase
+                .from('bookings')
+                .select('*', { count: 'exact', head: true })
+                .eq('check_in_date', today)
+                .eq('status', 'checked-in');
+
+            document.getElementById('todayCheckins').textContent = todayCheckins || 0;
+
+            // 3. Total Earnings
+            const { data: payments } = await supabase
+                .from('payments')
+                .select('amount');
+
+            const totalEarnings = payments ? payments.reduce((sum, p) => sum + Number(p.amount || 0), 0) : 0;
+            document.getElementById('totalEarnings').textContent = `KES ${totalEarnings.toLocaleString()}`;
+
+            // 4. Occupancy Rate
+            const { count: totalRooms } = await supabase
+                .from('rooms')
+                .select('*', { count: 'exact', head: true });
+
+            const { count: occupiedRooms } = await supabase
+                .from('bookings')
+                .select('*', { count: 'exact', head: true })
+                .eq('status', 'checked-in');
+
+            const occupancy = totalRooms && totalRooms > 0 
+                ? Math.round((occupiedRooms / totalRooms) * 100) 
+                : 0;
+            document.getElementById('occupancyRate').textContent = `${occupancy}%`;
+
+            console.log('✅ Dashboard stats loaded successfully');
+
+        } catch (error) {
+            console.error('❌ Error loading dashboard stats:', error);
+        }
+    }
+
+    // Load stats when dashboard becomes visible
+    document.addEventListener('DOMContentLoaded', () => {
+        const dashboard = document.getElementById('dashboardContent');
+        
+        // Check every 500ms if user is logged in
+        const checkLogin = setInterval(() => {
+            if (dashboard.style.display !== 'none') {
+                clearInterval(checkLogin);
+                loadDashboardStats();
+            }
+        }, 500);
+    });
+
+    // Auto refresh every 30 seconds
+    setInterval(() => {
+        const dashboard = document.getElementById('dashboardContent');
+        if (dashboard.style.display !== 'none') {
+            loadDashboardStats();
+        }
+    }, 30000);
+</script>
 </body>
 </html>
