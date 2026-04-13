@@ -122,23 +122,23 @@
     // ==================== DASHBOARD STATS LOADER ====================
     async function loadDashboardStats() {
         try {
-            // Wait until supabase is available from script.js
-            if (typeof supabase === 'undefined' || !supabase.from) {
-                console.warn('⏳ Supabase not ready yet, retrying...');
-                setTimeout(loadDashboardStats, 800);
+            // Stronger check - wait until supabase is fully ready
+            if (typeof supabase === 'undefined' || typeof supabase.from !== 'function') {
+                console.warn('⏳ Supabase not ready yet, retrying in 1 second...');
+                setTimeout(loadDashboardStats, 1000);
                 return;
             }
 
             console.log('🔄 Loading dashboard stats...');
 
-            // 1. Total Bookings
+            // Total Bookings
             const { count: totalBookings } = await supabase
                 .from('bookings')
                 .select('*', { count: 'exact', head: true });
 
             document.getElementById('totalBookings').textContent = totalBookings || 0;
 
-            // 2. Today's Check-ins
+            // Today's Check-ins
             const today = new Date().toISOString().split('T')[0];
             const { count: todayCheckins } = await supabase
                 .from('bookings')
@@ -148,7 +148,7 @@
 
             document.getElementById('todayCheckins').textContent = todayCheckins || 0;
 
-            // 3. Total Earnings
+            // Total Earnings
             const { data: payments } = await supabase
                 .from('payments')
                 .select('amount');
@@ -156,7 +156,7 @@
             const totalEarnings = payments ? payments.reduce((sum, p) => sum + Number(p.amount || 0), 0) : 0;
             document.getElementById('totalEarnings').textContent = `KES ${totalEarnings.toLocaleString()}`;
 
-            // 4. Occupancy Rate
+            // Occupancy Rate
             const { count: totalRooms } = await supabase
                 .from('rooms')
                 .select('*', { count: 'exact', head: true });
@@ -171,31 +171,32 @@
                 : 0;
             document.getElementById('occupancyRate').textContent = `${occupancy}%`;
 
-            console.log('✅ Dashboard stats loaded successfully');
+            console.log('✅ Dashboard stats loaded successfully!');
 
         } catch (error) {
             console.error('❌ Error loading dashboard stats:', error);
         }
     }
 
-    // Load stats after login
+    // Run when dashboard is visible
     document.addEventListener('DOMContentLoaded', () => {
         const dashboard = document.getElementById('dashboardContent');
         
-        const checkAndLoad = setInterval(() => {
-            if (dashboard.style.display !== 'none') {
-                clearInterval(checkAndLoad);
+        const waitForLogin = setInterval(() => {
+            if (dashboard && dashboard.style.display !== 'none') {
+                clearInterval(waitForLogin);
                 loadDashboardStats();
             }
-        }, 600);
+        }, 800);
     });
 
-    // Auto refresh every 30 seconds
+    // Auto-refresh every 25 seconds
     setInterval(() => {
-        if (document.getElementById('dashboardContent').style.display !== 'none') {
+        const dashboard = document.getElementById('dashboardContent');
+        if (dashboard && dashboard.style.display !== 'none') {
             loadDashboardStats();
         }
-    }, 30000);
+    }, 25000);
 </script>
 </body>
 </html>
