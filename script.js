@@ -349,7 +349,60 @@ async function handleBookingSubmit(e) {
         }
     }
 }
+// ==================== CHECK MY BOOKING ====================
+async function searchBookingByName() {
+    const name = document.getElementById('searchGuestName')?.value.trim();
+    const resultsDiv = document.getElementById('bookingSearchResults');
 
+    if (!name) {
+        resultsDiv.innerHTML = '<p style="color:red;">⚠️ Please enter your name!</p>';
+        return;
+    }
+
+    resultsDiv.innerHTML = '<p style="color:#aaa;">🔍 Searching...</p>';
+
+    try {
+        const { data, error } = await supabaseClient
+            .from('bookings')
+            .select('*')
+            .ilike('guest_name', `%${name}%`);
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            resultsDiv.innerHTML = '<p style="color:orange;">⚠️ No bookings found for that name.</p>';
+            return;
+        }
+
+        const statusColor = (status) => {
+            if (status === 'confirmed') return 'lightgreen';
+            if (status === 'cancelled') return '#e74c3c';
+            if (status === 'checked-in') return '#3498db';
+            if (status === 'checked-out') return '#aaa';
+            return 'orange'; // pending
+        };
+
+        resultsDiv.innerHTML = data.map(b => `
+            <div style="background:#111; border:1px solid #333; border-radius:10px; padding:1.2rem; margin-bottom:1rem;">
+                <p><strong>📋 Booking ID:</strong> ${b.booking_id}</p>
+                <p><strong>👤 Name:</strong> ${b.guest_name}</p>
+                <p><strong>🛏️ Room:</strong> ${b.room_id}</p>
+                <p><strong>📅 Check In:</strong> ${b.check_in}</p>
+                <p><strong>📅 Check Out:</strong> ${b.check_out}</p>
+                <p><strong>🌙 Nights:</strong> ${b.nights}</p>
+                <p><strong>💰 Total:</strong> KES ${(b.total_amount || 0).toLocaleString()}</p>
+                <p><strong>Status:</strong> 
+                    <span style="color:${statusColor(b.status)}; font-weight:bold; text-transform:uppercase;">
+                        ${b.status}
+                    </span>
+                </p>
+            </div>
+        `).join('');
+
+    } catch (err) {
+        resultsDiv.innerHTML = `<p style="color:red;">❌ Error: ${err.message}</p>`;
+    }
+}
 // ==================== TYPING ANIMATION ====================
 function typeWriter(element, text, speed = 100) {
     if (!element) return;
@@ -530,6 +583,7 @@ async function loadBookingsTable(filter = 'all') {
                 ${b.status === 'confirmed' ? `<button class="action-btn" onclick="updateBookingStatus('${b.booking_id}', 'checked-in')" title="Check-in">🚪</button>` : ''}
                 ${b.status === 'checked-in' ? `<button class="action-btn" onclick="updateBookingStatus('${b.booking_id}', 'checked-out')" title="Check-out">🚪❌</button>` : ''}
                 ${b.status !== 'checked-out' && b.status !== 'cancelled' ? `<button class="action-btn" onclick="updateBookingStatus('${b.booking_id}', 'cancelled')" title="Cancel">❌</button>` : ''}
+                ${b.status === 'cancelled' ? `<button class="action-btn" onclick="updateBookingStatus('${b.booking_id}', 'pending')" title="Reactivate">🔄</button>` : ''}
             </td>
         `;
     });
@@ -622,6 +676,28 @@ async function saveRoomRates() {
 }
 
 // ==================== ADMIN LOGIN ====================
+
+// Log login activity to Supabase
+async function logAdminActivity(event, status) {
+    try {
+        let ip = 'unknown';
+        try {
+            const res = await fetch('https://api.ipify.org?format=json');
+            const data = await res.json();
+            ip = data.ip;
+        } catch {}
+
+        await supabaseClient.from('admin_logs').insert({
+            event: event,
+            status: status,
+            ip_address: ip,
+            attempted_at: new Date().toISOString()
+        });
+    } catch (err) {
+        console.error('Failed to log activity:', err.message);
+    }
+}
+
 function initAdminLogin() {
     const loginOverlay = document.getElementById('loginOverlay');
     const dashboardContent = document.getElementById('dashboardContent');
@@ -636,19 +712,22 @@ function initAdminLogin() {
         loadAdminData();
     }
     
-    loginBtn?.addEventListener('click', () => {
+    loginBtn?.addEventListener('click', async () => {
         const password = document.getElementById('adminPassword')?.value;
         if (password === 'admin254') {
             sessionStorage.setItem('kag_admin_logged_in', 'true');
             loginOverlay.style.display = 'none';
             dashboardContent.style.display = 'block';
+            await logAdminActivity('Admin Login', 'success');
             loadAdminData();
         } else {
-            alert('❌ Wrong password! Use: admin254');
+            await logAdminActivity('Admin Login', 'failed');
+            alert('❌ Wrong password!');
         }
     });
     
-    logoutBtn?.addEventListener('click', () => {
+    logoutBtn?.addEventListener('click', async () => {
+        await logAdminActivity('Admin Logout', 'success');
         sessionStorage.removeItem('kag_admin_logged_in');
         location.reload();
     });
@@ -724,3 +803,4 @@ if (document.readyState === 'loading') {
 
 // Make functions available globally for HTML onclick
 window.updateBookingStatus = updateBookingStatus;
+window.searchBookingByName = searchBookingByName;
