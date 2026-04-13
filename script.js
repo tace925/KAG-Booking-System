@@ -88,9 +88,12 @@ async function loadReports() {
     if (!container) return;
 
     const allBookings = await fetchBookingsFromSupabase();
-    const checkedOut = allBookings.filter(b => b.status === 'checked-out');
-
-    const today = new Date().toISOString().split('T')[0];
+    
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}-${mm}-${dd}`;
 
     // Get start of this week (Monday)
     const now = new Date();
@@ -102,17 +105,26 @@ async function loadReports() {
     // Get start of this month
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
 
-    // Calculate earnings
-    const todayEarnings = checkedOut
-        .filter(b => b.created_at?.split('T')[0] === today)
+    // FIXED: Calculate earnings based on check-in date, not created_at
+    const todayEarnings = allBookings
+        .filter(b => {
+            const checkInStr = String(b.check_in || '').split('T')[0];
+            return checkInStr === todayStr && b.status === 'checked-out';
+        })
         .reduce((sum, b) => sum + (b.total_amount || 0), 0);
 
-    const weekEarnings = checkedOut
-        .filter(b => b.created_at?.split('T')[0] >= weekStart)
+    const weekEarnings = allBookings
+        .filter(b => {
+            const checkInStr = String(b.check_in || '').split('T')[0];
+            return checkInStr >= weekStart && b.status === 'checked-out';
+        })
         .reduce((sum, b) => sum + (b.total_amount || 0), 0);
 
-    const monthEarnings = checkedOut
-        .filter(b => b.created_at?.split('T')[0] >= monthStart)
+    const monthEarnings = allBookings
+        .filter(b => {
+            const checkInStr = String(b.check_in || '').split('T')[0];
+            return checkInStr >= monthStart && b.status === 'checked-out';
+        })
         .reduce((sum, b) => sum + (b.total_amount || 0), 0);
 
     // Update UI
@@ -123,8 +135,13 @@ async function loadReports() {
     document.getElementById('monthEarnings') && 
         (document.getElementById('monthEarnings').innerText = `KES ${monthEarnings.toLocaleString()}`);
 
-    // Current guests list
-    const currentGuests = allBookings.filter(b => b.status === 'checked-in');
+    // FIXED: Current guests list - Show guests with check-in <= today <= check-out
+    const currentGuests = allBookings.filter(b => {
+        const checkInStr = String(b.check_in || '').split('T')[0];
+        const checkOutStr = String(b.check_out || '').split('T')[0];
+        return checkInStr <= todayStr && checkOutStr >= todayStr;
+    });
+    
     const guestsContainer = document.getElementById('currentGuestsList');
     if (guestsContainer) {
         if (currentGuests.length === 0) {
@@ -133,7 +150,8 @@ async function loadReports() {
             guestsContainer.innerHTML = currentGuests.map(b => `
                 <div style="background:#1a1a1a; border:1px solid #333; border-radius:8px; padding:1rem; margin-bottom:0.5rem;">
                     <p><strong>👤 ${b.guest_name}</strong> — ${b.room_id}</p>
-                    <p style="color:#aaa; font-size:0.85rem;">Check-out: ${b.check_out} | KES ${(b.total_amount||0).toLocaleString()}</p>
+                    <p style="color:#aaa; font-size:0.85rem;">Check-in: ${b.check_in} | Check-out: ${b.check_out} | KES ${(b.total_amount||0).toLocaleString()}</p>
+                    <p><span class="status-badge status-${b.status}">${b.status}</span></p>
                 </div>
             `).join('');
         }
@@ -596,17 +614,58 @@ async function updateAdminStats() {
     const bookingsData = await fetchBookingsFromSupabase();
     bookings = bookingsData;
     
-    const totalBookings = bookings.length;
-    const today = new Date().toISOString().split('T')[0];
-    const todayCheckins = bookings.filter(b => b.check_in === today && b.status === 'confirmed').length;
-    const totalEarnings = bookings.filter(b => b.status === 'checked-out').reduce((sum, b) => sum + (b.total_amount || 0), 0);
-    const checkedIn = bookings.filter(b => b.status === 'checked-in').length;
-    const occupancyRate = checkedIn > 0 ? Math.min(100, (checkedIn / 5) * 100) : 0;
-    
+    // Get today in YYYY-MM-DD format
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}-${mm}-${dd}`;
+
+    console.log(`🧪 Today (YYYY-MM-DD) is: ${todayStr}`);
+
+    let totalBookings = bookings.length;
+    let todayCheckins = 0;
+    let totalEarnings = 0;
+    let checkedInCount = 0;
+    const totalRooms = 5; // Adjust this to your actual number of rooms
+
+    bookings.forEach(b => {
+        // Normalize dates (remove time if present)
+        const checkInStr = String(b.check_in || '').split('T')[0];
+        const checkOutStr = String(b.check_out || '').split('T')[0];
+        const status = String(b.status || '').trim().toLowerCase();
+
+        console.log(`📋 ${b.booking_id} | CheckIn: ${checkInStr} | CheckOut: ${checkOutStr} | Status: ${status}`);
+
+        // FIXED: Total Earnings - Count ALL completed bookings (checked-out)
+        if (status === 'checked-out') {
+            totalEarnings += Number(b.total_amount || 0);
+        }
+
+        // FIXED: Today's Check-ins - Check if check-in date is today REGARDLESS of status
+        // This counts anyone who was supposed to check in today (even if checked-out same day)
+        if (checkInStr === todayStr) {
+            todayCheckins++;
+        }
+
+        // FIXED: Occupancy - Currently staying today (check-in <= today <= check-out)
+        // Don't filter by status, just check date range
+        if (checkInStr && checkOutStr) {
+            if (checkInStr <= todayStr && checkOutStr >= todayStr) {
+                checkedInCount++;
+            }
+        }
+    });
+
+    const occupancyRate = totalRooms > 0 ? Math.round((checkedInCount / totalRooms) * 100) : 0;
+
+    console.log(`✅ Final Stats → Today Check-ins: ${todayCheckins}, Occupied: ${checkedInCount}/${totalRooms}, Occupancy: ${occupancyRate}%`);
+
+    // Update UI
     document.getElementById('totalBookings').innerText = totalBookings;
     document.getElementById('todayCheckins').innerText = todayCheckins;
     document.getElementById('totalEarnings').innerHTML = `KES ${totalEarnings.toLocaleString()}`;
-    document.getElementById('occupancyRate').innerText = `${Math.round(occupancyRate)}%`;
+    document.getElementById('occupancyRate').innerText = `${occupancyRate}%`;
 }
 
 async function loadBookingsTable(filter = 'all') {
