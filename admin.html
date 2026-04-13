@@ -122,8 +122,10 @@
     // ==================== DASHBOARD STATS LOADER ====================
     async function loadDashboardStats() {
         try {
-            if (typeof supabase === 'undefined') {
-                console.error('Supabase client not found. Make sure script.js loaded first.');
+            // Wait until supabase is available from script.js
+            if (typeof supabase === 'undefined' || !supabase.from) {
+                console.warn('⏳ Supabase not ready yet, retrying...');
+                setTimeout(loadDashboardStats, 800);
                 return;
             }
 
@@ -176,23 +178,21 @@
         }
     }
 
-    // Load stats when dashboard becomes visible
+    // Load stats after login
     document.addEventListener('DOMContentLoaded', () => {
         const dashboard = document.getElementById('dashboardContent');
         
-        // Check every 500ms if user is logged in
-        const checkLogin = setInterval(() => {
+        const checkAndLoad = setInterval(() => {
             if (dashboard.style.display !== 'none') {
-                clearInterval(checkLogin);
+                clearInterval(checkAndLoad);
                 loadDashboardStats();
             }
-        }, 500);
+        }, 600);
     });
 
     // Auto refresh every 30 seconds
     setInterval(() => {
-        const dashboard = document.getElementById('dashboardContent');
-        if (dashboard.style.display !== 'none') {
+        if (document.getElementById('dashboardContent').style.display !== 'none') {
             loadDashboardStats();
         }
     }, 30000);
