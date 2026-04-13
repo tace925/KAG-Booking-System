@@ -131,7 +131,7 @@ async function loadRoomOptions() {
     });
 }
 
-async function loadItemsCheckbox() {
+  async function loadItemsCheckbox() {
     const container = document.getElementById('itemsCheckbox');
     if (!container) return;
     
@@ -144,10 +144,14 @@ async function loadItemsCheckbox() {
     container.innerHTML = '';
     items.forEach(item => {
         const label = document.createElement('label');
-        const isBlanket = item.item_name?.toLowerCase().includes('blanket');
+        const isBlanket = item.name?.toLowerCase().includes('blanket');
+
+        // Blanket is free (1 included), others show replacement cost
+        const priceDisplay = isBlanket ? '1 free included' : `KES ${item.replacement_cost} replacement`;
+
         label.innerHTML = `
-            <input type="checkbox" class="requested-item" value="${item.item_id}" data-price="${item.price_per_day || 0}">
-            ${item.item_name} ${item.price_per_day ? `(KES ${item.price_per_day}/night)` : ''}
+            <input type="checkbox" class="requested-item" value="${item.item_id}" data-price="0">
+            ${item.name} (${priceDisplay})
         `;
         container.appendChild(label);
         
