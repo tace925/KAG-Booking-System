@@ -307,6 +307,7 @@ ul{ list-style:none; }
 .social-btn:hover{ transform:translateY(-1px); filter:brightness(1.08); }
 .social-btn.fb{ background:linear-gradient(180deg,#5b7cf0,#2c4bc4); }
 .social-btn.ig{ background:linear-gradient(180deg,#f0a15b,#c23f8a); }
+.social-btn.yt{ background:linear-gradient(180deg,#ff4e45,#c4302b); }
 
 /* ---------------- Footer ---------------- */
 .site-footer{
@@ -785,3 +786,188 @@ ul{ list-style:none; }
   padding:4px 10px; border-radius:999px;
   background:hsl(var(--hue) 70% 55% / .15); color:var(--gold);
 }
+
+
+/* ============================================================
+   PUBLIC LIBRARY
+   ============================================================ */
+.lib-rules{
+  background:var(--bg-panel); border:1px solid var(--line); border-radius:var(--radius-md);
+  padding:16px 20px; margin-bottom:24px; color:var(--text-mid); font-size:.9rem; line-height:1.55;
+}
+.lib-rules strong{ color:var(--gold); }
+.lib-toolbar{ margin-bottom:28px; }
+.lib-search{
+  width:100%; max-width:420px; padding:12px 16px; border-radius:999px;
+  background:var(--bg-panel); border:1px solid var(--line); color:var(--text-hi);
+  font-size:.9rem; margin-bottom:14px;
+}
+.lib-search:focus{ outline:none; border-color:var(--gold); }
+.lib-grid{
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:20px;
+}
+.lib-card{
+  background:var(--bg-panel); border:1px solid var(--line); border-radius:var(--radius-md);
+  padding:22px 18px; text-align:center; box-shadow:var(--shadow-card);
+  transition:transform .2s ease, border-color .2s ease;
+  display:flex; flex-direction:column; align-items:center; gap:6px;
+}
+.lib-card:hover{ transform:translateY(-3px); border-color:var(--gold-deep); }
+.lib-card-icon{ font-size:1.8rem; margin-bottom:4px; }
+.lib-card-title{ font-family:var(--font-display); font-weight:700; font-size:1.1rem; color:var(--text-hi); line-height:1.25; }
+.lib-card-author{ color:var(--text-mid); font-size:.85rem; }
+.lib-card-meta{ color:var(--text-low); font-size:.75rem; margin-top:4px; }
+.lib-card-status{
+  font-size:.68rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase;
+  padding:4px 10px; border-radius:999px; margin:6px 0;
+}
+.lib-avail{ background:rgba(76,175,110,.18); color:#4caf6e; }
+.lib-out{ background:hsl(var(--hue) 70% 55% / .15); color:var(--gold); }
+.lib-card-notes{ color:var(--text-low); font-size:.75rem; font-style:italic; }
+.lib-req-btn{ margin-top:10px; }
+.lib-req-btn:disabled{ opacity:.45; cursor:not-allowed; transform:none; }
+
+
+/* ============================================================
+   MENU PORTAL DROPDOWN
+   ============================================================ */
+.menu-dropdown-wrap{
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+}
+.menu-dropdown{
+  position:absolute;
+  top:calc(100% + 10px);
+  left:0;
+  z-index:200;
+  display:none;
+  flex-direction:column;
+  min-width:240px;
+  background:var(--bg-panel);
+  border:1px solid var(--line);
+  border-radius:var(--radius-md);
+  box-shadow:var(--shadow-card);
+  overflow:hidden;
+  padding:8px;
+}
+.menu-dropdown.active{
+  display:flex;
+}
+.menu-dropdown-item{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:12px 14px;
+  border-radius:var(--radius-sm);
+  background:transparent;
+  color:var(--text-mid);
+  font-weight:600;
+  font-size:.85rem;
+  text-align:left;
+  width:100%;
+  border:none;
+  cursor:pointer;
+  transition:background .15s ease, color .15s ease;
+  white-space:nowrap;
+}
+.menu-dropdown-item:hover{
+  background:var(--bg-panel-2);
+  color:var(--text-hi);
+}
+.menu-dropdown-item .ic{
+  font-size:1rem;
+  width:1.2em;
+  text-align:center;
+  flex-shrink:0;
+}
+.menu-dropdown-item .muted{
+  margin-left:auto;
+  font-size:.7rem;
+  opacity:.7;
+}
+
+
+/* ============================================================
+   ATTACH-VIA GRID (Send / Complaints forms)
+   ============================================================ */
+.attach-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(120px, 1fr));
+  gap:10px;
+  margin-top:6px;
+}
+.attach-btn{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  padding:12px;
+  border-radius:var(--radius-sm);
+  background:var(--bg-panel-2);
+  border:1px solid var(--line);
+  color:var(--text-mid);
+  font-size:.8rem;
+  font-weight:700;
+  cursor:pointer;
+  text-align:center;
+  font-family:inherit;
+  transition:color .15s ease, border-color .15s ease, background .15s ease;
+}
+.attach-btn:hover{
+  color:var(--gold);
+  border-color:var(--gold);
+  background:var(--bg-panel-3);
+}
+.attach-btn .ic{ font-size:1rem; }
+
+/* ============================================================
+   PORTAL CONTROL CARDS
+   ============================================================ */
+.portal-cards-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));
+  gap:18px;
+}
+.portal-card{
+  background:var(--bg-panel-2);
+  border:1px solid var(--line);
+  border-radius:var(--radius-md);
+  padding:22px;
+  text-align:center;
+}
+.portal-card-avatar{
+  width:64px; height:64px; border-radius:50%; margin:0 auto 12px; overflow:hidden;
+  background:var(--bg-panel-3); display:flex; align-items:center; justify-content:center;
+  font-size:1.4rem; border:2px solid var(--gold);
+}
+.portal-card-avatar img{ width:100%; height:100%; object-fit:cover; }
+.portal-card-name{ font-family:var(--font-display); font-weight:700; font-size:1.05rem; margin-bottom:6px; }
+.portal-card-status{
+  font-size:.64rem; font-weight:800; letter-spacing:.05em; text-transform:uppercase;
+  padding:4px 10px; border-radius:999px; display:inline-block; margin-bottom:14px;
+}
+.portal-card-status.linked{ background:rgba(76,175,110,.18); color:#4caf6e; }
+.portal-card-status.unlinked{ background:hsl(var(--hue) 70% 55% / .15); color:var(--gold); }
+.portal-card-actions{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+
+/* ============================================================
+   LIBRARY OVERDUE
+   ============================================================ */
+.lib-overdue-banner{
+  background:rgba(232,96,122,.12);
+  border:1px solid rgba(232,96,122,.35);
+  color:#e8607a;
+  border-radius:var(--radius-sm);
+  padding:12px 16px;
+  margin-bottom:14px;
+  font-size:.88rem;
+  font-weight:700;
+}
+.lib-overdue-row{
+  border-color:rgba(232,96,122,.4) !important;
+  background:rgba(232,96,122,.06) !important;
+}
+
+.footer-credit a{ color:var(--gold); text-decoration:underline; text-underline-offset:3px; }
+.footer-credit a:hover{ filter:brightness(1.15); }

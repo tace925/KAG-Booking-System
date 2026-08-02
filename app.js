@@ -16,7 +16,7 @@ const DB_KEY = 'motl_katoloni_v1';
 
 const SEED_DATA = {
   meta: {
-    version: 6,
+    version: 8,
     createdAt: new Date().toISOString()
   },
 
@@ -105,9 +105,29 @@ const SEED_DATA = {
     ]
   },
 
-  /* ---------- Katoloni Wall — disciple class graduates ---------- */
+  /* ---------- Katoloni Wall — disciple class graduates ----------
+     Pipeline: Protocol intakes new joiners → sends list to Admin →
+     Admin assigns into Disciple Class 1 → that leader confirms who's
+     ready → sends confirmed list to Admin → Admin generates
+     certificates & publishes to the Wall under "class1" → same
+     people cycle through "class2", "class3" → finally "general"
+     once they've completed all three. ---------- */
   graduates: [
-    // { id, name, discipleClass: 1|2|3, graduatedAt }
+    // { id, name, photo, category: 'class1'|'class2'|'class3'|'general', month, year, status: 'active'|'revoked', revokeReason, at }
+  ],
+
+  /* ---------- Portal profiles — Protocol + the 3 Disciple Class portals ---------- */
+  portalProfiles: {
+    bishop:    { name: 'Bishop',           phone: '', email: '', photo: '' },
+    protocol:  { name: 'Protocol Team',   phone: '', email: '', photo: '' },
+    disciple1: { name: 'Disciple Class 1', phone: '', email: '', photo: '' },
+    disciple2: { name: 'Disciple Class 2', phone: '', email: '', photo: '' },
+    disciple3: { name: 'Disciple Class 3', phone: '', email: '', photo: '' }
+  },
+
+  /* ---------- Complaints raised by the 4 portals, addressed to Admin/Bishop ---------- */
+  complaints: [
+    // { id, fromRole, toRole, title, issue, attachment, at, status: 'open'|'resolved' }
   ],
 
   /* ---------- Library ---------- */
@@ -115,11 +135,21 @@ const SEED_DATA = {
     sections: [
       { id: 's1', name: 'Sunday School' },
       { id: 's2', name: 'Theology' },
-      { id: 's3', name: 'Youth Materials' }
+      { id: 's3', name: 'Youth Materials' },
+      { id: 's4', name: 'Discipleship' },
+      { id: 's5', name: 'Prayer & Healing' },
+      { id: 's6', name: 'Biography / History' }
     ],
     items: [
-      // { id, sectionId, name, qty }
-    ]
+      // { id, sectionId, title, author, qty, notes }
+    ],
+    loans: [
+      // { id, itemId, borrowerName, borrowerPhone, borrowedAt, dueAt, returnedAt, status: 'out'|'returned' }
+    ],
+    requests: [
+      // { id, itemId, name, phone, message, at, status: 'pending'|'fulfilled'|'declined' }
+    ],
+    rules: 'Borrow up to 3 books for 14 days. Renew once if no one is waiting. Lost or damaged books must be replaced or paid for.'
   },
 
   /* ---------- Contact page — admin-editable "Get in Touch" content ---------- */
@@ -189,6 +219,11 @@ function loadDB() {
       localStorage.setItem(DB_KEY, JSON.stringify(SEED_DATA));
       return structuredClone(SEED_DATA);
     }
+    // Soft-migrate: ensure bishop portal profile exists
+    if (!parsed.portalProfiles) parsed.portalProfiles = {};
+    if (!parsed.portalProfiles.bishop) {
+      parsed.portalProfiles.bishop = { name: 'Bishop', phone: '', email: '', photo: '' };
+    }
     return parsed;
   } catch (e) {
     console.error('DB parse failed, reseeding', e);
@@ -217,6 +252,38 @@ function logAudit(actorRole, actorLabel, action, target = '') {
     at: new Date().toISOString()
   });
   saveDB(db);
+}
+
+/* ---------- Portal identity ----------
+   Drives the Menu dropdown, passcode routing, and every "which
+   portal am I in" decision across the member-portal shell. ---------- */
+const PORTAL_DEFS = {
+  admin:     { key: 'admin',     label: 'Admin',              icon: '🔑' },
+  bishop:    { key: 'bishop',    label: 'Bishop',             icon: '✝' },
+  protocol:  { key: 'protocol',  label: 'Protocol',           icon: '🛎' },
+  disciple1: { key: 'disciple1', label: 'Disciple Class 1',   icon: '📖' },
+  disciple2: { key: 'disciple2', label: 'Disciple Class 2',   icon: '📖' },
+  disciple3: { key: 'disciple3', label: 'Disciple Class 3',   icon: '📖' }
+};
+const PORTAL_PASSCODE_PREFIX = { bishop: 'bsh', protocol: 'prt', disciple1: 'dis1', disciple2: 'dis2', disciple3: 'dis3' };
+
+/* ---------- Reusable inline SVG bar chart (Report tabs) ---------- */
+function svgBarChartHTML(stats, width = 680, height = 240) {
+  const max = Math.max(1, ...stats.map(s => s.value));
+  const slot = (width - 60) / stats.length;
+  const barW = Math.min(64, slot - 24);
+  const chartH = height - 50;
+  const bars = stats.map((s, i) => {
+    const x = 40 + i * slot + (slot - barW) / 2;
+    const h = Math.round((s.value / max) * chartH);
+    const y = chartH - h + 20;
+    return `
+      <rect x="${x}" y="${y}" width="${barW}" height="${Math.max(h, 2)}" rx="6" fill="${s.color}" opacity="0.92"/>
+      <text x="${x + barW / 2}" y="${y - 8}" text-anchor="middle" font-size="13" font-weight="700" fill="var(--text-hi)">${s.value}</text>
+      <text x="${x + barW / 2}" y="${height - 6}" text-anchor="middle" font-size="10.5" fill="var(--text-low)">${s.label}</text>
+    `;
+  }).join('');
+  return `<svg viewBox="0 0 ${width} ${height}" style="width:100%; max-width:${width}px; height:auto; margin-top:6px; display:block;">${bars}</svg>`;
 }
 
 /* ---------- Image helper: resize + compress to base64 ---------- */
@@ -260,6 +327,9 @@ document.addEventListener('DOMContentLoaded', () => {
   initCardTapFlip();
   renderNoticeboard(db);
   renderPublicTour(db);
+  renderPublicProject(db);
+  renderPublicWall(db);
+  renderPublicLibrary(db);
   initMenuAndSettings();
   initAdminPortal();
   initBookingPublic();
@@ -464,12 +534,21 @@ function renderNoticeboard(db) {
   `;
 }
 
+/* ---------------- Photo → YouTube link overlay ----------------
+   Small pill shown on top of a photo, linking out to the church's
+   YouTube channel (db.contact.youtube). Reused by Tour and Project. */
+function photoYoutubeLinkHTML(youtubeUrl) {
+  if (!youtubeUrl) return '';
+  return `<a class="photo-yt-link" href="${youtubeUrl}" target="_blank" rel="noopener" title="Watch on YouTube" onclick="event.stopPropagation();"><span class="ic">▶️</span> YouTube</a>`;
+}
+
 /* ---------------- Public Tour page render ---------------- */
-function tourCardHTML(label, image) {
+function tourCardHTML(label, image, youtubeUrl) {
   return `
     <div class="tour-card">
-      <div class="tour-card-img">
+      <div class="tour-card-img photo-yt-wrap">
         ${image ? `<img src="${image}" alt="${label}">` : `<div class="tour-card-empty"><span class="ic">📷</span></div>`}
+        ${image ? photoYoutubeLinkHTML(youtubeUrl) : ''}
       </div>
       <div class="tour-card-label">${label}</div>
     </div>
@@ -480,6 +559,7 @@ function renderPublicTour(db) {
   const el = document.getElementById('tourContent');
   if (!el) return;
   const t = db.tour;
+  const ytUrl = db.contact?.youtube || '';
 
   const groupSection = (key) => {
     const meta = TOUR_GROUP_META[key];
@@ -489,7 +569,7 @@ function renderPublicTour(db) {
       <div class="tour-group">
         <h3 class="tour-group-title"><span class="ic">${meta.icon}</span> ${meta.label}</h3>
         <div class="tour-grid">
-          ${items.map(it => tourCardHTML(it.name, it.image)).join('')}
+          ${items.map(it => tourCardHTML(it.name, it.image, ytUrl)).join('')}
         </div>
       </div>
     `;
@@ -503,7 +583,7 @@ function renderPublicTour(db) {
       <div class="tour-group">
         <h3 class="tour-group-title"><span class="ic">🏛</span> The Grounds</h3>
         <div class="tour-grid">
-          ${singlesWithImages.map(v => tourCardHTML(v.label, t.singles[v.key])).join('')}
+          ${singlesWithImages.map(v => tourCardHTML(v.label, t.singles[v.key], ytUrl)).join('')}
         </div>
       </div>
     ` : ''}
@@ -514,19 +594,143 @@ function renderPublicTour(db) {
   `;
 }
 
-/* ---------------- Header buttons: Menu → Admin Portal, Settings ---------------- */
+/* ---------------- Public Project page render ----------------
+   Renders db.project.past/present/upcoming media galleries.
+   Previously this section had no public renderer at all, so
+   uploads made in the admin Project tab never appeared here. */
+const PROJECT_STAGE_META = {
+  past:     { label: 'Past',     icon: '🕰' },
+  present:  { label: 'Present',  icon: '🏛' },
+  upcoming: { label: 'Upcoming', icon: '🚧' }
+};
+const PROJECT_STAGE_ORDER = ['past', 'present', 'upcoming'];
+
+function projectMediaCardHTML(image, youtubeUrl) {
+  return `
+    <div class="project-media-card photo-yt-wrap">
+      <img src="${image}" alt="Project photo">
+      ${photoYoutubeLinkHTML(youtubeUrl)}
+    </div>
+  `;
+}
+
+function renderPublicProject(db) {
+  const el = document.getElementById('projectContent');
+  if (!el) return;
+  const p = db.project;
+  const ytUrl = db.contact?.youtube || '';
+
+  const stageSection = (key) => {
+    const meta = PROJECT_STAGE_META[key];
+    const stage = p[key];
+    if (!stage || !stage.media.length) return '';
+    return `
+      <div class="project-stage">
+        <h3 class="project-stage-title"><span class="ic">${meta.icon}</span> ${meta.label}</h3>
+        ${stage.caption ? `<div class="project-stage-caption">${stage.caption}</div>` : ''}
+        <div class="project-media-grid">
+          ${stage.media.map(m => projectMediaCardHTML(m, ytUrl)).join('')}
+        </div>
+      </div>
+    `;
+  };
+
+  const hasAnyMedia = PROJECT_STAGE_ORDER.some(k => (p[k]?.media || []).length);
+
+  el.innerHTML = `
+    <p class="section-lede">${p.history}</p>
+    ${PROJECT_STAGE_ORDER.map(stageSection).join('')}
+    ${!hasAnyMedia ? `
+      <div class="coming-soon"><div class="ic">🏗</div>Past / Present / Upcoming photos are being added — check back soon.</div>
+    ` : ''}
+  `;
+}
+
+/* ---------------- Public Katoloni Wall render ----------------
+   Four categories, fed by the Protocol → Disciple 1/2/3 → Admin
+   graduation pipeline. Only "active" (non-revoked) records show. */
+const WALL_CATEGORY_META = {
+  class1:  { label: 'First Disciple Class',  icon: '①' },
+  class2:  { label: 'Second Disciple Class', icon: '②' },
+  class3:  { label: 'Third Disciple Class',  icon: '③' },
+  general: { label: 'General Wall — Fully Graduated', icon: '🎓' }
+};
+const WALL_CATEGORY_ORDER = ['class1', 'class2', 'class3', 'general'];
+const WALL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+function renderPublicWall(db) {
+  const el = document.getElementById('wallContent');
+  if (!el) return;
+  const graduates = db.graduates || [];
+
+  const catSection = (cat) => {
+    const meta = WALL_CATEGORY_META[cat];
+    const items = graduates.filter(g => g.category === cat && g.status === 'active');
+    if (!items.length) return '';
+    return `
+      <div class="tour-group">
+        <h3 class="tour-group-title"><span class="ic">${meta.icon}</span> ${meta.label}</h3>
+        <div class="tour-grid">
+          ${items.map(g => `
+            <div class="tour-card">
+              <div class="tour-card-img">
+                ${g.photo ? `<img src="${g.photo}" alt="${g.name}">` : `<div class="tour-card-empty"><span class="ic">🎓</span></div>`}
+              </div>
+              <div class="tour-card-label">${g.name}<div class="muted small">${g.month || ''} ${g.year || ''}</div></div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  };
+
+  const hasAny = graduates.some(g => g.status === 'active');
+
+  el.innerHTML = `
+    ${WALL_CATEGORY_ORDER.map(catSection).join('')}
+    ${!hasAny ? `
+      <div class="coming-soon"><div class="ic">👥</div>Graduate records will appear here as classes complete.</div>
+    ` : ''}
+  `;
+}
+
+/* ---------------- Header buttons: Menu dropdown → portal picker, Settings ---------------- */
 function initMenuAndSettings() {
   document.getElementById('settingsBtn').addEventListener('click', () => {
     alert('Settings panel builds next — theme default, notification preferences, session timeout, and passcode shortcuts.');
   });
+
+  document.getElementById('menuBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.getElementById('menuDropdown')?.classList.toggle('active');
+  });
+
+  document.querySelectorAll('.menu-dropdown-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const portal = item.dataset.portal;
+      document.getElementById('menuDropdown')?.classList.remove('active');
+      if (PORTAL_DEFS[portal]?.placeholder) {
+        alert(`The ${PORTAL_DEFS[portal].label} portal is coming soon.`);
+        return;
+      }
+      openPortalPasscodeGate(portal, 'profile');
+    });
+  });
+
+  document.addEventListener('click', (e) => {
+    const wrap = document.getElementById('menuDropdownWrap');
+    if (wrap && !wrap.contains(e.target)) document.getElementById('menuDropdown')?.classList.remove('active');
+  });
 }
 
 /* ============================================================
-   ADMIN PORTAL
+   ADMIN PORTAL + THE 4 MEMBER PORTALS
    ------------------------------------------------------------
-   Menu button → passcode gate (checked against db.passcodes,
-   seeded with admin-4321) → Owner/Admin Portal with a sidebar
-   of CMS sections mirroring the public nav.
+   Menu button → dropdown of portals (Admin, Bishop [placeholder],
+   Protocol, Disciple Class 1/2/3) → passcode gate scoped to that
+   portal (checked against db.passcodes by role) → either the full
+   Owner/Admin Portal, or a lightweight member-portal shell shared
+   by Protocol + the 3 Disciple Class portals.
    ============================================================ */
 
 const ADMIN_TABS = [
@@ -540,15 +744,42 @@ const ADMIN_TABS = [
   { key: 'wall',     label: 'Katoloni Wall', icon: '👥' },
   { key: 'booking',  label: 'Booking',       icon: '🛏' },
   { key: 'library',  label: 'Library',       icon: '📚' },
-  { key: 'contact',  label: 'Contact',       icon: '✉' }
+  { key: 'contact',  label: 'Contact',       icon: '✉' },
+  { key: 'portalControl', label: 'Portal Control', icon: '🗂' },
+  { key: 'report',   label: 'Report',        icon: '📊' }
 ];
+
+const MEMBER_TABS_DEFAULT = [
+  { key: 'profile',     label: 'Profile',     icon: '👤' },
+  { key: 'received',    label: 'Received',    icon: '📥' },
+  { key: 'send',        label: 'Send',        icon: '📤' },
+  { key: 'complaints',  label: 'Complaints',  icon: '⚠️' },
+  { key: 'report',      label: 'Report',      icon: '📊' }
+];
+const MEMBER_TABS_BISHOP = [
+  { key: 'profile',  label: 'Profile',  icon: '👤' },
+  { key: 'received', label: 'Received', icon: '📥' },
+  { key: 'send',     label: 'Send',     icon: '📤' },
+  { key: 'report',   label: 'Report',   icon: '📊' }
+];
+function getMemberTabs() {
+  return activePortalKey === 'bishop' ? MEMBER_TABS_BISHOP : MEMBER_TABS_DEFAULT;
+}
 
 let adminActiveTab = 'profile';
 let pendingAdminTarget = 'profile';
+let pendingPortalKey = 'admin';
+let activePortalKey = 'admin';     // 'admin' | 'protocol' | 'disciple1' | 'disciple2' | 'disciple3'
+let memberActiveTab = 'profile';
+let adminEditingPortal = false;    // true when Admin opened a portal via "Update" from Portal Control
+
+function setAdminPortalTitle(text, icon = '🔑') {
+  const el = document.querySelector('.admin-title');
+  if (el) el.innerHTML = `<span class="ic">${icon}</span> ${text}`;
+}
 
 function initAdminPortal() {
-  document.getElementById('menuBtn').addEventListener('click', () => openPasscodeGate('profile'));
-  document.getElementById('headerBellBtn')?.addEventListener('click', () => openPasscodeGate('received'));
+  document.getElementById('headerBellBtn')?.addEventListener('click', () => openPortalPasscodeGate('admin', 'received'));
   document.getElementById('passcodeCancel').addEventListener('click', closePasscodeGate);
   document.getElementById('passcodeSubmit').addEventListener('click', attemptPasscode);
   document.getElementById('passcodeInput').addEventListener('keydown', e => {
@@ -569,18 +800,21 @@ function initAdminPortal() {
     if (e.target.id === 'messageReviewOverlay') closeMessageReview();
   });
 
-  // Delete-reason modal
+  // Delete-reason modal (contact messages + Katoloni Wall regenerate/permanent-delete)
   document.getElementById('deleteReasonCancelBtn')?.addEventListener('click', closeDeleteReason);
-  document.getElementById('deleteReasonConfirmBtn')?.addEventListener('click', confirmDeleteMessage);
+  document.getElementById('deleteReasonConfirmBtn')?.addEventListener('click', confirmDeleteReasonAction);
   document.getElementById('deleteReasonOverlay')?.addEventListener('click', e => {
     if (e.target.id === 'deleteReasonOverlay') closeDeleteReason();
   });
 }
 
-function openPasscodeGate(target = 'profile') {
+function openPortalPasscodeGate(portalKey, target = 'profile') {
+  pendingPortalKey = portalKey;
   pendingAdminTarget = target;
   document.getElementById('passcodeError').textContent = '';
   document.getElementById('passcodeInput').value = '';
+  const titleEl = document.querySelector('#passcodeOverlay h3');
+  if (titleEl) titleEl.innerHTML = `<span class="ic">🔑</span> ${PORTAL_DEFS[portalKey].label} Access`;
   document.getElementById('passcodeOverlay').classList.add('active');
   setTimeout(() => document.getElementById('passcodeInput').focus(), 50);
 }
@@ -592,10 +826,15 @@ function closePasscodeGate() {
 function attemptPasscode() {
   const entered = document.getElementById('passcodeInput').value.trim();
   const db = loadDB();
-  const match = db.passcodes.find(p => p.code === entered && !p.revoked);
+  const requiredRole = pendingPortalKey === 'admin' ? 'super_admin' : pendingPortalKey;
+  const match = db.passcodes.find(p => p.code === entered && !p.revoked && p.role === requiredRole);
   if (match) {
     closePasscodeGate();
-    openAdminPortal(match);
+    if (pendingPortalKey === 'admin') {
+      openAdminPortal(match);
+    } else {
+      openMemberPortal(pendingPortalKey, match);
+    }
   } else {
     document.getElementById('passcodeError').textContent = 'Incorrect passcode. Try again.';
   }
@@ -603,7 +842,10 @@ function attemptPasscode() {
 
 function openAdminPortal(passcodeRecord) {
   const db = loadDB();
+  activePortalKey = 'admin';
+  adminEditingPortal = false;
   document.getElementById('adminSignedInName').textContent = db.owner?.name || passcodeRecord.label || 'Admin';
+  setAdminPortalTitle('Owner / Admin Portal');
   document.getElementById('adminOverlay').classList.add('active');
   document.body.style.overflow = 'hidden';
   adminActiveTab = pendingAdminTarget || 'profile';
@@ -612,14 +854,36 @@ function openAdminPortal(passcodeRecord) {
   logAudit(passcodeRecord.role, passcodeRecord.label, 'Logged in to Admin Portal');
 }
 
+/* ---------- Member portal (Protocol + Disciple Class 1/2/3) ---------- */
+function openMemberPortal(portalKey, passcodeRecord) {
+  const db = loadDB();
+  activePortalKey = portalKey;
+  adminEditingPortal = false;
+  const profile = db.portalProfiles[portalKey];
+  document.getElementById('adminSignedInName').textContent = passcodeRecord.label || profile.name;
+  setAdminPortalTitle(`${PORTAL_DEFS[portalKey].label} Portal`, PORTAL_DEFS[portalKey].icon);
+  document.getElementById('adminOverlay').classList.add('active');
+  document.body.style.overflow = 'hidden';
+  memberActiveTab = 'profile';
+  renderMemberSidebar();
+  switchMemberTab('profile');
+  logAudit(portalKey, passcodeRecord.label, `Logged in to ${PORTAL_DEFS[portalKey].label} Portal`);
+}
+
 function closeAdminPortal() {
   document.getElementById('adminOverlay').classList.remove('active');
   document.body.style.overflow = '';
+  activePortalKey = 'admin';
+  adminEditingPortal = false;
+  setAdminPortalTitle('Owner / Admin Portal');
   // Reflect any CMS edits made while inside the portal back onto the public page
   const db = loadDB();
   renderLeadershipPyramid(db);
   renderNoticeboard(db);
   renderPublicTour(db);
+  renderPublicProject(db);
+  renderPublicWall(db);
+  renderPublicLibrary(db);
   renderPublicRooms(db);
   renderRoomOptions(db);
   renderItemOptions(db);
@@ -635,10 +899,18 @@ function closeAdminPortal() {
 }
 
 /* ---------- Unread badge (contact "new" + unread internal messages) ---------- */
+function libraryAlertCount(db) {
+  const lib = db.library || {};
+  const pendingReq = (lib.requests || []).filter(r => r.status === 'pending').length;
+  const today = new Date().toISOString().slice(0, 10);
+  const overdue = (lib.loans || []).filter(l => l.status === 'out' && l.dueAt && l.dueAt < today).length;
+  return pendingReq + overdue;
+}
+
 function combinedUnreadCount(db) {
-  const newContact = db.contactSubmissions.filter(c => c.status === 'new').length;
-  const unreadInternal = db.messages.filter(m => m.toRole === 'super_admin' && !m.readAt).length;
-  return newContact + unreadInternal;
+  const newContact = (db.contactSubmissions || []).filter(c => c.status === 'new').length;
+  const unreadInternal = (db.messages || []).filter(m => m.toRole === 'super_admin' && !m.readAt).length;
+  return newContact + unreadInternal + libraryAlertCount(db);
 }
 
 function updateHeaderBellBadge(db) {
@@ -656,13 +928,20 @@ function updateHeaderBellBadge(db) {
 function renderAdminSidebar() {
   const db = loadDB();
   const unread = combinedUnreadCount(db);
+  const libAlerts = libraryAlertCount(db);
+  const receivedOnly = (db.contactSubmissions || []).filter(c => c.status === 'new').length
+    + (db.messages || []).filter(m => m.toRole === 'super_admin' && !m.readAt).length;
   const el = document.getElementById('adminSidebar');
-  el.innerHTML = ADMIN_TABS.map(t => `
+  el.innerHTML = ADMIN_TABS.map(t => {
+    let badge = '';
+    if (t.key === 'received' && receivedOnly > 0) badge = `<span class="badge-count">${receivedOnly}</span>`;
+    if (t.key === 'library' && libAlerts > 0) badge = `<span class="badge-count">${libAlerts}</span>`;
+    return `
     <button type="button" class="admin-side-btn ${t.key === adminActiveTab ? 'active' : ''}" data-tab="${t.key}">
       <span class="ic">${t.icon}</span> ${t.label}
-      ${t.key === 'received' && unread > 0 ? `<span class="badge-count">${unread}</span>` : ''}
-    </button>
-  `).join('');
+      ${badge}
+    </button>`;
+  }).join('');
   el.querySelectorAll('.admin-side-btn').forEach(btn => {
     btn.addEventListener('click', () => switchAdminTab(btn.dataset.tab));
   });
@@ -682,9 +961,358 @@ function switchAdminTab(tab) {
     wall: renderAdminWall,
     booking: renderAdminBooking,
     library: renderAdminLibrary,
-    contact: renderAdminContact
+    contact: renderAdminContact,
+    portalControl: renderAdminPortalControl,
+    report: renderAdminReport
   };
   (renderers[tab] || renderAdminProfile)();
+}
+
+/* ============================================================
+   MEMBER PORTAL SHELL — shared by Protocol + Disciple Class 1/2/3
+   ============================================================ */
+function renderMemberSidebar() {
+  const el = document.getElementById('adminSidebar');
+  const backBtn = adminEditingPortal ? `
+    <button type="button" class="admin-side-btn" id="backToAdminReportBtn"><span class="ic">←</span> Back to Admin</button>
+    <div style="border-top:1px solid var(--line); margin:6px 0 10px;"></div>
+  ` : '';
+  const db = loadDB();
+  const unreadMember = (db.messages || []).filter(m => m.toRole === activePortalKey && !m.readAt).length;
+  el.innerHTML = backBtn + getMemberTabs().map(t => {
+    const badge = (t.key === 'received' && unreadMember > 0) ? `<span class="badge-count">${unreadMember}</span>` : '';
+    return `
+    <button type="button" class="admin-side-btn ${t.key === memberActiveTab ? 'active' : ''}" data-mtab="${t.key}">
+      <span class="ic">${t.icon}</span> ${t.label}
+      ${badge}
+    </button>`;
+  }).join('');
+  el.querySelectorAll('[data-mtab]').forEach(btn => {
+    btn.addEventListener('click', () => switchMemberTab(btn.dataset.mtab));
+  });
+  document.getElementById('backToAdminReportBtn')?.addEventListener('click', () => {
+    adminEditingPortal = false;
+    activePortalKey = 'admin';
+    setAdminPortalTitle('Owner / Admin Portal');
+    document.getElementById('adminSignedInName').textContent = loadDB().owner.name;
+    adminActiveTab = 'portalControl';
+    renderAdminSidebar();
+    switchAdminTab('portalControl');
+  });
+}
+
+function switchMemberTab(tab) {
+  memberActiveTab = tab;
+  renderMemberSidebar();
+  const renderers = {
+    profile: renderMemberProfile,
+    received: renderMemberReceived,
+    send: renderMemberSend,
+    complaints: renderMemberComplaints,
+    report: renderMemberReport
+  };
+  (renderers[tab] || renderMemberProfile)();
+}
+
+function renderMemberProfile() {
+  const db = loadDB();
+  const profile = db.portalProfiles[activePortalKey];
+  document.getElementById('adminContent').innerHTML = `
+    <div class="admin-panel">
+      <h3 class="admin-panel-title"><span class="ic">👤</span> ${PORTAL_DEFS[activePortalKey].label} Profile</h3>
+      <div class="profile-grid">
+        <div class="avatar-upload">
+          <div class="avatar-preview" id="portalAvatarPreview">
+            ${profile.photo ? `<img src="${profile.photo}" alt="${profile.name}">` : `<span>${(profile.name || '?').split(' ').map(w => w[0]).slice(0, 2).join('')}</span>`}
+          </div>
+          <label class="file-btn">
+            <input type="file" id="portalPhotoInput" accept="image/*" hidden>
+            Choose File
+          </label>
+        </div>
+        <div class="form-fields">
+          <div class="form-row">
+            <div class="form-field">
+              <label>Department / Leader Name</label>
+              <input type="text" id="portalNameInput" value="${profile.name || ''}">
+            </div>
+            <div class="form-field">
+              <label>Phone</label>
+              <input type="text" id="portalPhoneInput" value="${profile.phone || ''}">
+            </div>
+          </div>
+          <div class="form-field">
+            <label>Email</label>
+            <input type="text" id="portalEmailInput" value="${profile.email || ''}">
+          </div>
+          <button type="button" class="icon-btn gold" id="portalProfileSaveBtn"><span class="ic">💾</span> Save Changes</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  let pendingPhoto = null;
+  document.getElementById('portalPhotoInput').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    pendingPhoto = await fileToBase64(file);
+    document.getElementById('portalAvatarPreview').innerHTML = `<img src="${pendingPhoto}" alt="preview">`;
+  });
+
+  document.getElementById('portalProfileSaveBtn').addEventListener('click', () => {
+    const dbNow = loadDB();
+    const p = dbNow.portalProfiles[activePortalKey];
+    p.name = document.getElementById('portalNameInput').value.trim() || p.name;
+    p.phone = document.getElementById('portalPhoneInput').value.trim();
+    p.email = document.getElementById('portalEmailInput').value.trim();
+    if (pendingPhoto) p.photo = pendingPhoto;
+    saveDB(dbNow);
+    document.getElementById('adminSignedInName').textContent = p.name;
+    logAudit(activePortalKey, p.name, 'Updated portal profile');
+    renderMemberProfile();
+  });
+}
+
+function memberReceivedExportRows(items) {
+  return items.map(m => ({
+    from: PORTAL_DEFS[m.fromRole]?.label || m.fromRole || '',
+    subject: m.subject || '',
+    body: (m.body || '').replace(/\n/g, ' '),
+    attachment: m.attachment || '',
+    date: m.at ? new Date(m.at).toLocaleString() : '',
+    status: m.readAt ? 'cleared' : 'new'
+  }));
+}
+
+function downloadMemberCSV(items) {
+  const rows = memberReceivedExportRows(items);
+  const header = 'From,Subject,Body,Attachment,Date,Status';
+  const lines = rows.map(r => [r.from, r.subject, r.body, r.attachment, r.date, r.status].map(c => `"${String(c).replace(/"/g, '""')}"`).join(','));
+  const blob = new Blob([[header, ...lines].join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `received-${activePortalKey}.csv`;
+  a.click();
+}
+
+function downloadMemberExcel(items) {
+  // Simple HTML table as .xls
+  const rows = memberReceivedExportRows(items);
+  let html = '<table><tr><th>From</th><th>Subject</th><th>Body</th><th>Attachment</th><th>Date</th><th>Status</th></tr>';
+  rows.forEach(r => {
+    html += `<tr><td>${r.from}</td><td>${r.subject}</td><td>${r.body}</td><td>${r.attachment}</td><td>${r.date}</td><td>${r.status}</td></tr>`;
+  });
+  html += '</table>';
+  const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `received-${activePortalKey}.xls`;
+  a.click();
+}
+
+function printMemberPDF(items) {
+  const rows = memberReceivedExportRows(items);
+  const w = window.open('', '_blank');
+  w.document.write(`<html><head><title>Received Messages</title>
+    <style>body{font-family:sans-serif;padding:24px} table{width:100%;border-collapse:collapse} th,td{border:1px solid #ccc;padding:8px;text-align:left;font-size:12px} th{background:#f5f5f5}</style>
+    </head><body><h2>${PORTAL_DEFS[activePortalKey]?.label || ''} — Received</h2>
+    <table><thead><tr><th>From</th><th>Subject</th><th>Body</th><th>Attachment</th><th>Date</th><th>Status</th></tr></thead><tbody>
+    ${rows.map(r => `<tr><td>${r.from}</td><td>${r.subject}</td><td>${r.body}</td><td>${r.attachment}</td><td>${r.date}</td><td>${r.status}</td></tr>`).join('') || '<tr><td colspan="6">Nothing received yet.</td></tr>'}
+    </tbody></table></body></html>`);
+  w.document.close();
+  w.focus();
+  setTimeout(() => w.print(), 300);
+}
+
+function renderMemberReceived() {
+  const db = loadDB();
+  const items = (db.messages || []).filter(m => m.toRole === activePortalKey);
+  document.getElementById('adminContent').innerHTML = `
+    <div class="admin-panel">
+      <h3 class="admin-panel-title"><span class="ic">📥</span> Received</h3>
+      <p class="muted small" style="margin-bottom:12px;">${items.length} message${items.length === 1 ? '' : 's'} stored for this portal.</p>
+      <div class="cms-list">
+        ${items.length ? items.map(m => `
+          <div class="cms-list-item">
+            <div>
+              <strong>${m.subject || '(no subject)'}</strong>
+              <div class="muted small">From ${PORTAL_DEFS[m.fromRole]?.label || m.fromRole} · ${new Date(m.at).toLocaleString()}</div>
+              <div>${m.body}</div>
+              ${m.attachment ? `<div class="muted small">📎 ${m.attachment}</div>` : ''}
+            </div>
+            ${!m.readAt ? `<button type="button" class="icon-btn small" data-clearmsg="${m.id}"><span class="ic">✅</span> Clear</button>` : `<span class="status-badge status-checked-out">cleared</span>`}
+          </div>
+        `).join('') : '<p class="muted">Nothing received yet.</p>'}
+      </div>
+      <div class="export-bar" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;">
+        <button type="button" class="icon-btn small" id="memberExportCSV"><span class="ic">⬇</span> Save CSV</button>
+        <button type="button" class="icon-btn small" id="memberExportExcel"><span class="ic">⬇</span> Save Excel</button>
+        <button type="button" class="icon-btn small" id="memberExportPDF"><span class="ic">🖨</span> Save / Print PDF</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('memberExportCSV')?.addEventListener('click', () => downloadMemberCSV(items));
+  document.getElementById('memberExportExcel')?.addEventListener('click', () => downloadMemberExcel(items));
+  document.getElementById('memberExportPDF')?.addEventListener('click', () => printMemberPDF(items));
+  document.querySelectorAll('[data-clearmsg]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const dbNow = loadDB();
+      const msg = dbNow.messages.find(m => m.id === btn.dataset.clearmsg);
+      if (msg) msg.readAt = new Date().toISOString();
+      saveDB(dbNow);
+      renderMemberSidebar();
+      renderMemberReceived();
+    });
+  });
+}
+
+
+function memberSendOptionsHTML() {
+  const all = [
+    { value: 'super_admin', label: 'Admin' },
+    { value: 'bishop', label: 'Bishop' },
+    { value: 'protocol', label: 'Protocol' },
+    { value: 'disciple1', label: 'Disciple Class 1' },
+    { value: 'disciple2', label: 'Disciple Class 2' },
+    { value: 'disciple3', label: 'Disciple Class 3' }
+  ];
+  let list = all;
+  if (activePortalKey === 'bishop') {
+    list = all.filter(o => o.value !== 'bishop');
+  } else {
+    // protocol/disciple: can send to admin, bishop, and other portals (not self)
+    list = all.filter(o => o.value !== activePortalKey);
+  }
+  return list.map(o => `<option value="${o.value}">${o.label}</option>`).join('');
+}
+
+function renderMemberSend() {
+  document.getElementById('adminContent').innerHTML = `
+    <div class="admin-panel">
+      <h3 class="admin-panel-title"><span class="ic">📤</span> Send</h3>
+      <div class="form-field">
+        <label>To</label>
+        <select id="memberSendTo">${memberSendOptionsHTML()}</select>
+      </div>
+      <div class="form-field"><label>Subject</label><input type="text" id="memberSendSubject" placeholder="Subject"></div>
+      <div class="form-field"><label>Message</label><textarea id="memberSendBody" rows="4" placeholder="Write your message..."></textarea></div>
+      <div class="form-field">
+        <label>Attach Via</label>
+        <div class="attach-grid">
+          <label class="attach-btn"><input type="file" id="memberSendFile" hidden><span class="ic">📄</span> File</label>
+          <button type="button" class="attach-btn" id="memberSendPasteLink"><span class="ic">🔗</span> Paste Link</button>
+          <button type="button" class="attach-btn" id="memberSendNewNote"><span class="ic">📝</span> New Note</button>
+        </div>
+        <div class="muted small" id="memberSendAttachPreview"></div>
+      </div>
+      <button type="button" class="complete-booking-btn" id="memberSendBtn"><span class="ic">📤</span> Send</button>
+    </div>
+  `;
+  let attachment = '';
+  document.getElementById('memberSendFile').addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (f) { attachment = f.name; document.getElementById('memberSendAttachPreview').textContent = `📎 ${attachment}`; }
+  });
+  document.getElementById('memberSendPasteLink').addEventListener('click', () => {
+    const link = prompt('Paste a link:');
+    if (link) { attachment = link; document.getElementById('memberSendAttachPreview').textContent = `🔗 ${attachment}`; }
+  });
+  document.getElementById('memberSendNewNote').addEventListener('click', () => {
+    const note = prompt('Write a quick note:');
+    if (note) { attachment = note; document.getElementById('memberSendAttachPreview').textContent = `📝 ${attachment}`; }
+  });
+  document.getElementById('memberSendBtn').addEventListener('click', () => {
+    const toRole = document.getElementById('memberSendTo').value;
+    const subject = document.getElementById('memberSendSubject').value.trim();
+    const body = document.getElementById('memberSendBody').value.trim();
+    if (!body) { alert('Please write a message.'); return; }
+    const dbNow = loadDB();
+    dbNow.messages.unshift({ id: uid('msg'), fromRole: activePortalKey, toRole, subject, body, attachment: attachment || null, at: new Date().toISOString(), readAt: null });
+    saveDB(dbNow);
+    logAudit(activePortalKey, dbNow.portalProfiles[activePortalKey].name, 'Sent message', toRole);
+    alert('Message sent.');
+    renderMemberSend();
+  });
+}
+
+function renderMemberComplaints() {
+  const db = loadDB();
+  const mine = db.complaints.filter(c => c.fromRole === activePortalKey);
+  document.getElementById('adminContent').innerHTML = `
+    <div class="admin-panel">
+      <h3 class="admin-panel-title"><span class="ic">⚠️</span> Raise a Complaint</h3>
+      <div class="form-field">
+        <label>Send To</label>
+        <select id="complaintTo">
+          <option value="super_admin">Admin</option>
+          <option value="bishop">Bishop</option>
+        </select>
+      </div>
+      <div class="form-field"><label>Title</label><input type="text" id="complaintTitle" placeholder="Complaint title"></div>
+      <div class="form-field"><label>Issue</label><textarea id="complaintIssue" rows="4" placeholder="Describe the issue..."></textarea></div>
+      <div class="form-field">
+        <label>Attachment (optional)</label>
+        <label class="file-btn"><input type="file" id="complaintFile" hidden>Upload File</label>
+        <div class="muted small" id="complaintAttachPreview"></div>
+      </div>
+      <button type="button" class="complete-booking-btn" id="complaintSendBtn"><span class="ic">⚠️</span> Submit Complaint</button>
+    </div>
+    <div class="admin-panel">
+      <h3 class="admin-panel-title"><span class="ic">📋</span> My Complaints</h3>
+      <div class="cms-list">
+        ${mine.length ? mine.map(c => `
+          <div class="cms-list-item">
+            <div>
+              <strong>${c.title}</strong> <span class="muted small">→ ${PORTAL_DEFS[c.toRole]?.label || c.toRole} · ${new Date(c.at).toLocaleString()}</span>
+              <div class="muted small">${c.issue}</div>
+              ${c.attachment ? `<div class="muted small">📎 ${c.attachment}</div>` : ''}
+            </div>
+            <span class="status-badge status-${c.status === 'resolved' ? 'checked-out' : 'pending'}">${c.status}</span>
+          </div>
+        `).join('') : '<p class="muted">No complaints raised yet.</p>'}
+      </div>
+    </div>
+  `;
+  let attachment = '';
+  document.getElementById('complaintFile').addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (f) { attachment = f.name; document.getElementById('complaintAttachPreview').textContent = `📎 ${attachment}`; }
+  });
+  document.getElementById('complaintSendBtn').addEventListener('click', () => {
+    const toRole = document.getElementById('complaintTo').value;
+    const title = document.getElementById('complaintTitle').value.trim();
+    const issue = document.getElementById('complaintIssue').value.trim();
+    if (!title || !issue) { alert('Please enter a title and describe the issue.'); return; }
+    const dbNow = loadDB();
+    dbNow.complaints.unshift({ id: uid('cmp'), fromRole: activePortalKey, toRole, title, issue, attachment: attachment || null, at: new Date().toISOString(), status: 'open' });
+    saveDB(dbNow);
+    logAudit(activePortalKey, dbNow.portalProfiles[activePortalKey].name, 'Raised complaint', title);
+    alert('Complaint submitted.');
+    renderMemberComplaints();
+  });
+}
+
+function renderMemberReport() {
+  const db = loadDB();
+  const sent = db.messages.filter(m => m.fromRole === activePortalKey).length;
+  const received = db.messages.filter(m => m.toRole === activePortalKey).length;
+  const complaints = db.complaints.filter(c => c.fromRole === activePortalKey).length;
+  const stats = [
+    { label: 'Sent', value: sent, color: 'var(--gold)' },
+    { label: 'Received', value: received, color: '#5b7cf0' },
+    { label: 'Complaints', value: complaints, color: '#e8607a' }
+  ];
+  document.getElementById('adminContent').innerHTML = `
+    <div class="admin-panel">
+      <h3 class="admin-panel-title"><span class="ic">📊</span> ${PORTAL_DEFS[activePortalKey].label} Report</h3>
+      <div class="admin-stats-grid">
+        ${adminStatCard('📤', 'Sent', sent)}
+        ${adminStatCard('📥', 'Received', received)}
+        ${adminStatCard('⚠️', 'Complaints', complaints)}
+      </div>
+      ${svgBarChartHTML(stats, 560, 220)}
+    </div>
+  `;
 }
 
 /* ---------- Profile tab ---------- */
@@ -952,15 +1580,91 @@ function initLeadershipManagementHandlers() {
 
 /* ---------- Invite tab (placeholder only) ---------- */
 function renderAdminInvite() {
+  const db = loadDB();
+  const portalRoles = ['bishop', 'protocol', 'disciple1', 'disciple2', 'disciple3'];
+  const issued = db.passcodes.filter(p => portalRoles.includes(p.role));
+
   document.getElementById('adminContent').innerHTML = `
     <div class="admin-panel">
-      <h3 class="admin-panel-title"><span class="ic">🔑</span> Invite Agent</h3>
-      <p class="muted">Invite flow builds next.</p>
-      <button type="button" class="icon-btn gold" id="inviteBtn"><span class="ic">➕</span> Invite</button>
+      <h3 class="admin-panel-title"><span class="ic">🔑</span> Invite a Portal Leader</h3>
+      <p class="muted" style="margin-bottom:18px;">Enter the leader's details, choose their portal, then generate a passcode for them to log in with.</p>
+      <div class="form-row">
+        <div class="form-field"><label>Full Name</label><input type="text" id="inviteName" placeholder="Full name"></div>
+        <div class="form-field"><label>Phone</label><input type="text" id="invitePhone" placeholder="07XX XXX XXX"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-field"><label>Email</label><input type="text" id="inviteEmail" placeholder="name@email.com"></div>
+        <div class="form-field">
+          <label>Portal</label>
+          <select id="invitePortal">
+            <option value="bishop">Bishop</option>
+            <option value="protocol">Protocol</option>
+            <option value="disciple1">Disciple Class 1</option>
+            <option value="disciple2">Disciple Class 2</option>
+            <option value="disciple3">Disciple Class 3</option>
+          </select>
+        </div>
+      </div>
+      <button type="button" class="icon-btn gold" id="inviteGenerateBtn"><span class="ic">🔑</span> Generate Passcode</button>
+    </div>
+
+    <div class="admin-panel">
+      <h3 class="admin-panel-title"><span class="ic">📋</span> Issued Passcodes</h3>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead><tr><th>Portal</th><th>Leader</th><th>Passcode</th><th>Issued</th><th>Actions</th></tr></thead>
+          <tbody>
+            ${issued.length ? issued.map(p => `
+              <tr>
+                <td>${PORTAL_DEFS[p.role]?.label || p.role}</td>
+                <td>${p.label}</td>
+                <td style="font-family:monospace; color:var(--gold); font-weight:700;">${p.revoked ? 'REVOKED' : p.code}</td>
+                <td>${new Date(p.generatedAt).toLocaleDateString()}</td>
+                <td class="table-actions">
+                  ${!p.revoked ? `<button type="button" class="mini-del" data-revokepass="${p.id}" title="Revoke">✕</button>` : ''}
+                </td>
+              </tr>
+            `).join('') : `<tr><td colspan="5" class="muted" style="text-align:center; padding:24px;">No passcodes issued yet</td></tr>`}
+          </tbody>
+        </table>
+      </div>
     </div>
   `;
-  document.getElementById('inviteBtn').addEventListener('click', () => {
-    alert('Invite flow builds next.');
+
+  document.getElementById('inviteGenerateBtn').addEventListener('click', () => {
+    const name = document.getElementById('inviteName').value.trim();
+    const phone = document.getElementById('invitePhone').value.trim();
+    const email = document.getElementById('inviteEmail').value.trim();
+    const portal = document.getElementById('invitePortal').value;
+    if (!name || !phone) { alert("Please enter the leader's full name and phone number."); return; }
+    const prefix = PORTAL_PASSCODE_PREFIX[portal];
+    const rand = Math.floor(1000 + Math.random() * 9000);
+    const code = `${prefix}-2026-${rand}`;
+    const dbNow = loadDB();
+    dbNow.passcodes.push({
+      id: uid('pc'), role: portal, label: name, code,
+      generatedBy: dbNow.owner.name, generatedAt: new Date().toISOString(), revoked: false
+    });
+    dbNow.portalProfiles[portal].name = name;
+    dbNow.portalProfiles[portal].phone = phone;
+    dbNow.portalProfiles[portal].email = email;
+    saveDB(dbNow);
+    logAudit('super_admin', dbNow.owner.name, 'Generated portal passcode', `${PORTAL_DEFS[portal].label} — ${name}`);
+    alert(`Passcode generated: ${code}\n\nShare this with ${name} to access the ${PORTAL_DEFS[portal].label} portal.`);
+    renderAdminInvite();
+  });
+
+  document.querySelectorAll('[data-revokepass]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const dbNow = loadDB();
+      const rec = dbNow.passcodes.find(p => p.id === btn.dataset.revokepass);
+      if (rec && confirm(`Revoke passcode for ${rec.label}?`)) {
+        rec.revoked = true;
+        saveDB(dbNow);
+        logAudit('super_admin', dbNow.owner.name, 'Revoked portal passcode', rec.label);
+        renderAdminInvite();
+      }
+    });
   });
 }
 
@@ -1074,32 +1778,66 @@ function saveReviewedMessage() {
   updateHeaderBellBadge(dbNow);
 }
 
-/* ---- Delete with required reason ---- */
-let deletingMessageId = null;
+/* ---- Delete with required reason ----
+   Generalized to serve two flows:
+   1. Contact messages: permanent delete.
+   2. Katoloni Wall records: a leader's "Revoke" sends a record here
+      for the admin to decide — Regenerate (restore to active) or
+      Permanently Delete — either way a reason is required. */
+let deleteReasonContext = null; // { type: 'contact' | 'graduate-regenerate' | 'graduate-delete', id }
 
 function openDeleteReason(id) {
-  deletingMessageId = id;
+  deleteReasonContext = { type: 'contact', id };
   document.getElementById('deleteReasonText').value = '';
+  const titleEl = document.querySelector('#deleteReasonOverlay h3');
+  if (titleEl) titleEl.innerHTML = `<span class="ic">🗑</span> Delete Message`;
+  document.getElementById('deleteReasonOverlay').classList.add('active');
+}
+
+function openGraduateDecision(id, action) {
+  deleteReasonContext = { type: action === 'regenerate' ? 'graduate-regenerate' : 'graduate-delete', id };
+  document.getElementById('deleteReasonText').value = '';
+  const titleEl = document.querySelector('#deleteReasonOverlay h3');
+  if (titleEl) titleEl.innerHTML = action === 'regenerate'
+    ? `<span class="ic">↺</span> Regenerate Wall Record`
+    : `<span class="ic">🗑</span> Permanently Delete Wall Record`;
   document.getElementById('deleteReasonOverlay').classList.add('active');
 }
 
 function closeDeleteReason() {
   document.getElementById('deleteReasonOverlay').classList.remove('active');
-  deletingMessageId = null;
+  deleteReasonContext = null;
 }
 
-function confirmDeleteMessage() {
-  if (!deletingMessageId) return;
+function confirmDeleteReasonAction() {
+  if (!deleteReasonContext) return;
   const reason = document.getElementById('deleteReasonText').value.trim();
   const db = loadDB();
-  const msg = db.contactSubmissions.find(c => c.id === deletingMessageId);
-  db.contactSubmissions = db.contactSubmissions.filter(c => c.id !== deletingMessageId);
-  saveDB(db);
-  logAudit('super_admin', db.owner.name, 'Deleted contact message', `${msg ? msg.name : ''} — reason: ${reason || '(none given)'}`);
-  closeDeleteReason();
-  renderAdminReceived();
-  renderAdminSidebar();
-  updateHeaderBellBadge(loadDB());
+
+  if (deleteReasonContext.type === 'contact') {
+    const msg = db.contactSubmissions.find(c => c.id === deleteReasonContext.id);
+    db.contactSubmissions = db.contactSubmissions.filter(c => c.id !== deleteReasonContext.id);
+    saveDB(db);
+    logAudit('super_admin', db.owner.name, 'Deleted contact message', `${msg ? msg.name : ''} — reason: ${reason || '(none given)'}`);
+    closeDeleteReason();
+    renderAdminReceived();
+    renderAdminSidebar();
+    updateHeaderBellBadge(loadDB());
+  } else if (deleteReasonContext.type === 'graduate-regenerate') {
+    const g = db.graduates.find(x => x.id === deleteReasonContext.id);
+    if (g) { g.status = 'active'; g.revokeReason = null; }
+    saveDB(db);
+    logAudit('super_admin', db.owner.name, 'Regenerated wall record', `${g ? g.name : ''} — reason: ${reason || '(none given)'}`);
+    closeDeleteReason();
+    renderAdminWall();
+  } else if (deleteReasonContext.type === 'graduate-delete') {
+    const g = db.graduates.find(x => x.id === deleteReasonContext.id);
+    db.graduates = db.graduates.filter(x => x.id !== deleteReasonContext.id);
+    saveDB(db);
+    logAudit('super_admin', db.owner.name, 'Permanently deleted wall record', `${g ? g.name : ''} — reason: ${reason || '(none given)'}`);
+    closeDeleteReason();
+    renderAdminWall();
+  }
 }
 
 /* ---- Regenerate: send a stored message back to New ---- */
@@ -1137,27 +1875,49 @@ function renderAdminSend() {
     <div class="admin-panel">
       <h3 class="admin-panel-title"><span class="ic">📤</span> Send</h3>
       <div class="form-field">
-        <label>To Role</label>
-        <input type="text" id="sendToRole" placeholder="e.g. deacon, treasurer">
+        <label>To</label>
+        <select id="sendToRole">
+          <option value="bishop">Bishop</option>
+          <option value="protocol">Protocol</option>
+          <option value="disciple1">Disciple Class 1</option>
+          <option value="disciple2">Disciple Class 2</option>
+          <option value="disciple3">Disciple Class 3</option>
+        </select>
       </div>
+      <div class="form-field"><label>Subject</label><input type="text" id="sendSubject" placeholder="Subject"></div>
+      <div class="form-field"><label>Message</label><textarea id="sendBody" rows="4" placeholder="Write your message..."></textarea></div>
       <div class="form-field">
-        <label>Subject</label>
-        <input type="text" id="sendSubject" placeholder="Subject">
-      </div>
-      <div class="form-field">
-        <label>Message</label>
-        <textarea id="sendBody" rows="4" placeholder="Write your message..."></textarea>
+        <label>Attach Via</label>
+        <div class="attach-grid">
+          <label class="attach-btn"><input type="file" id="sendFile" hidden><span class="ic">📄</span> File</label>
+          <button type="button" class="attach-btn" id="sendPasteLink"><span class="ic">🔗</span> Paste Link</button>
+          <button type="button" class="attach-btn" id="sendNewNote"><span class="ic">📝</span> New Note</button>
+        </div>
+        <div class="muted small" id="sendAttachPreview"></div>
       </div>
       <button type="button" class="icon-btn gold" id="sendBtn"><span class="ic">📤</span> Send Message</button>
     </div>
   `;
+  let attachment = '';
+  document.getElementById('sendFile').addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (f) { attachment = f.name; document.getElementById('sendAttachPreview').textContent = `📎 ${attachment}`; }
+  });
+  document.getElementById('sendPasteLink').addEventListener('click', () => {
+    const link = prompt('Paste a link:');
+    if (link) { attachment = link; document.getElementById('sendAttachPreview').textContent = `🔗 ${attachment}`; }
+  });
+  document.getElementById('sendNewNote').addEventListener('click', () => {
+    const note = prompt('Write a quick note:');
+    if (note) { attachment = note; document.getElementById('sendAttachPreview').textContent = `📝 ${attachment}`; }
+  });
   document.getElementById('sendBtn').addEventListener('click', () => {
-    const toRole = document.getElementById('sendToRole').value.trim();
+    const toRole = document.getElementById('sendToRole').value;
     const subject = document.getElementById('sendSubject').value.trim();
     const body = document.getElementById('sendBody').value.trim();
-    if (!toRole || !body) { alert('Please fill in recipient role and message.'); return; }
+    if (!toRole || !body) { alert('Please select a recipient and write a message.'); return; }
     const dbNow = loadDB();
-    dbNow.messages.unshift({ id: uid('msg'), fromRole: 'super_admin', toRole, subject, body, attachment: null, at: new Date().toISOString(), readAt: null });
+    dbNow.messages.unshift({ id: uid('msg'), fromRole: 'super_admin', toRole, subject, body, attachment: attachment || null, at: new Date().toISOString(), readAt: null });
     saveDB(dbNow);
     logAudit('super_admin', dbNow.owner.name, 'Sent message', toRole);
     alert('Message sent.');
@@ -1470,49 +2230,145 @@ function renderAdminNotices() {
   });
 }
 
-/* ---------- Katoloni Wall CMS (graduates) ---------- */
+/* ---------- Katoloni Wall CMS (graduates) ----------
+   Admin adds records with a photo into one of the 4 categories.
+   Active records show a Revoke button; revoked records show
+   Regenerate / Permanent Delete (both require a reason via the
+   shared delete-reason modal). Search filters by name/month/year. */
+let wallSearchQuery = { name: '', month: '', year: '' };
+
 function renderAdminWall() {
   const db = loadDB();
   document.getElementById('adminContent').innerHTML = `
     <div class="admin-panel">
-      <h3 class="admin-panel-title"><span class="ic">👥</span> Katoloni Wall — Graduates</h3>
-      <div class="cms-list">
-        ${db.graduates.map(g => `
-          <div class="cms-list-item">
-            <div><strong>${g.name}</strong> <span class="muted small">— Class ${g.discipleClass} · ${new Date(g.graduatedAt).toLocaleDateString()}</span></div>
-            <button type="button" class="mini-del" data-grad="${g.id}">✕</button>
+      <h3 class="admin-panel-title"><span class="ic">➕</span> Add to Katoloni Wall</h3>
+      <div class="lead-mgmt-card" style="background:var(--bg-panel-3);">
+        <div class="lead-mgmt-photo">
+          <div class="lead-mgmt-avatar" id="wallNewAvatarPreview"><span>+</span></div>
+          <label class="file-btn small"><input type="file" id="wallNewPhoto" accept="image/*" hidden>Upload Photo</label>
+        </div>
+        <div class="lead-mgmt-fields">
+          <div class="form-field"><label>Full Name</label><input type="text" id="wallNewName" placeholder="Full name"></div>
+          <div class="form-field">
+            <label>Category</label>
+            <select id="wallNewCategory">
+              ${Object.entries(WALL_CATEGORY_META).map(([k, m]) => `<option value="${k}">${m.label}</option>`).join('')}
+            </select>
           </div>
-        `).join('') || '<p class="muted">No graduates added yet.</p>'}
-      </div>
-      <div class="cms-add-row">
-        <input type="text" id="gradName" placeholder="Full name">
-        <select id="gradClass">
-          <option value="1">Class 1</option>
-          <option value="2">Class 2</option>
-          <option value="3">Class 3</option>
-        </select>
-        <button type="button" class="icon-btn small" id="gradAddBtn">+ Add Graduate</button>
+          <div class="form-field">
+            <label>Month</label>
+            <select id="wallNewMonth">${WALL_MONTHS.map(m => `<option value="${m}">${m}</option>`).join('')}</select>
+          </div>
+          <div class="form-field"><label>Year</label><input type="number" id="wallNewYear" value="${new Date().getFullYear()}"></div>
+        </div>
+        <div class="lead-mgmt-actions">
+          <button type="button" class="icon-btn gold small" id="wallAddBtn"><span class="ic">➕</span> Add Record</button>
+        </div>
       </div>
     </div>
+
+    <div class="admin-panel">
+      <h3 class="admin-panel-title"><span class="ic">🔍</span> Search &amp; Filter</h3>
+      <div class="cms-add-row">
+        <input type="text" id="wallSearchName" placeholder="Search by name..." value="${wallSearchQuery.name}">
+        <select id="wallSearchMonth">
+          <option value="">All Months</option>
+          ${WALL_MONTHS.map(m => `<option value="${m}" ${wallSearchQuery.month === m ? 'selected' : ''}>${m}</option>`).join('')}
+        </select>
+        <input type="number" id="wallSearchYear" placeholder="Year" value="${wallSearchQuery.year}">
+      </div>
+    </div>
+
+    ${WALL_CATEGORY_ORDER.map(cat => wallCategoryPanelHTML(db, cat)).join('')}
   `;
-  document.getElementById('gradAddBtn').addEventListener('click', () => {
-    const name = document.getElementById('gradName').value.trim();
-    if (!name) return;
-    const discipleClass = +document.getElementById('gradClass').value;
+
+  document.getElementById('wallNewPhoto').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const b64 = await fileToBase64(file, 500, 0.75);
+    const preview = document.getElementById('wallNewAvatarPreview');
+    preview.innerHTML = `<img src="${b64}">`;
+    preview.dataset.photo = b64;
+  });
+
+  document.getElementById('wallAddBtn').addEventListener('click', () => {
+    const name = document.getElementById('wallNewName').value.trim();
+    const category = document.getElementById('wallNewCategory').value;
+    const month = document.getElementById('wallNewMonth').value;
+    const year = +document.getElementById('wallNewYear').value;
+    const photo = document.getElementById('wallNewAvatarPreview').dataset.photo || '';
+    if (!name) { alert('Please enter a name.'); return; }
     const dbNow = loadDB();
-    dbNow.graduates.push({ id: uid('g'), name, discipleClass, graduatedAt: new Date().toISOString() });
+    dbNow.graduates.push({ id: uid('g'), name, photo, category, month, year, status: 'active', revokeReason: null, at: new Date().toISOString() });
     saveDB(dbNow);
-    logAudit('super_admin', dbNow.owner.name, 'Added graduate', name);
+    logAudit('super_admin', dbNow.owner.name, 'Added wall record', `${name} — ${WALL_CATEGORY_META[category].label}`);
     renderAdminWall();
   });
-  document.querySelectorAll('[data-grad]').forEach(btn => {
+
+  ['wallSearchName', 'wallSearchMonth', 'wallSearchYear'].forEach(id => {
+    const handler = () => {
+      wallSearchQuery.name = document.getElementById('wallSearchName').value.trim().toLowerCase();
+      wallSearchQuery.month = document.getElementById('wallSearchMonth').value;
+      wallSearchQuery.year = document.getElementById('wallSearchYear').value;
+      renderAdminWall();
+    };
+    document.getElementById(id).addEventListener('input', handler);
+    document.getElementById(id).addEventListener('change', handler);
+  });
+
+  document.querySelectorAll('[data-wallrevoke]').forEach(btn => {
     btn.addEventListener('click', () => {
       const dbNow = loadDB();
-      dbNow.graduates = dbNow.graduates.filter(g => g.id !== btn.dataset.grad);
+      const g = dbNow.graduates.find(x => x.id === btn.dataset.wallrevoke);
+      if (g) g.status = 'revoked';
       saveDB(dbNow);
+      logAudit('super_admin', dbNow.owner.name, 'Revoked wall record', g ? g.name : '');
       renderAdminWall();
     });
   });
+  document.querySelectorAll('[data-wallregenerate]').forEach(btn => {
+    btn.addEventListener('click', () => openGraduateDecision(btn.dataset.wallregenerate, 'regenerate'));
+  });
+  document.querySelectorAll('[data-walldelete]').forEach(btn => {
+    btn.addEventListener('click', () => openGraduateDecision(btn.dataset.walldelete, 'delete'));
+  });
+}
+
+function wallCategoryPanelHTML(db, cat) {
+  const meta = WALL_CATEGORY_META[cat];
+  let items = db.graduates.filter(g => g.category === cat);
+  if (wallSearchQuery.name) items = items.filter(g => g.name.toLowerCase().includes(wallSearchQuery.name));
+  if (wallSearchQuery.month) items = items.filter(g => g.month === wallSearchQuery.month);
+  if (wallSearchQuery.year) items = items.filter(g => String(g.year) === String(wallSearchQuery.year));
+
+  return `
+    <div class="admin-panel">
+      <h3 class="admin-panel-title"><span class="ic">${meta.icon}</span> ${meta.label}</h3>
+      <div class="cms-list">
+        ${items.length ? items.map(g => `
+          <div class="cms-list-item">
+            <div style="display:flex; gap:12px; align-items:center;">
+              <div class="lead-mgmt-avatar" style="width:44px; height:44px;">
+                ${g.photo ? `<img src="${g.photo}">` : `<span>${(g.name || '?').split(' ').map(w => w[0]).slice(0, 2).join('')}</span>`}
+              </div>
+              <div>
+                <strong>${g.name}</strong>
+                <span class="status-badge status-${g.status === 'revoked' ? 'pending' : 'checked-in'}">${g.status}</span>
+                <div class="muted small">${g.month} ${g.year}</div>
+              </div>
+            </div>
+            <div class="table-actions">
+              ${g.status === 'active'
+                ? `<button type="button" class="icon-btn small" data-wallrevoke="${g.id}"><span class="ic">🚩</span> Revoke</button>`
+                : `<button type="button" class="icon-btn small" data-wallregenerate="${g.id}"><span class="ic">↺</span> Regenerate</button>
+                   <button type="button" class="icon-btn small" style="background:rgba(232,96,122,.15); color:#e8607a; border-color:transparent;" data-walldelete="${g.id}"><span class="ic">🗑</span> Permanent Delete</button>`
+              }
+            </div>
+          </div>
+        `).join('') : '<p class="muted">No records in this category yet.</p>'}
+      </div>
+    </div>
+  `;
 }
 
 /* ---------- Booking dashboard (stats + Bookings / Room Rates / Item Tracking / Reports) ---------- */
@@ -1851,54 +2707,426 @@ function renderAdminReports() {
 }
 
 /* ---------- Library CMS ---------- */
-function renderAdminLibrary() {
-  const db = loadDB();
-  document.getElementById('adminContent').innerHTML = `
-    <div class="admin-panel">
-      <h3 class="admin-panel-title"><span class="ic">📚</span> Library — Items</h3>
-      <div class="cms-list">
-        ${db.library.items.map(it => {
-          const sec = db.library.sections.find(s => s.id === it.sectionId);
-          return `
-            <div class="cms-list-item">
-              <div><strong>${it.name}</strong> <span class="muted small">— ${sec ? sec.name : 'Uncategorized'} · qty ${it.qty}</span></div>
-              <button type="button" class="mini-del" data-item="${it.id}">✕</button>
-            </div>
-          `;
-        }).join('') || '<p class="muted">No items added yet.</p>'}
-      </div>
-      <div class="cms-add-row">
-        <input type="text" id="libItemName" placeholder="Item name">
-        <select id="libItemSection">
-          ${db.library.sections.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
-        </select>
-        <input type="number" id="libItemQty" placeholder="Qty" value="1">
-        <button type="button" class="icon-btn small" id="libAddBtn">+ Add Item</button>
+
+/* ---------- Library helpers ---------- */
+function libAvailable(db, item) {
+  const out = (db.library.loans || []).filter(l => l.itemId === item.id && l.status === 'out').length;
+  return Math.max(0, (item.qty || 0) - out);
+}
+
+function libDueDate(days = 14) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/* ---------- Public Library page ---------- */
+function renderPublicLibrary(db) {
+  const el = document.getElementById('libraryContent');
+  if (!el) return;
+  const lib = db.library || { sections: [], items: [], loans: [], requests: [], rules: '' };
+  const items = lib.items || [];
+  const sections = lib.sections || [];
+
+  el.innerHTML = `
+    <p class="section-lede">Browse our church library. Request a book and pick it up from the library desk or a deacon on duty.</p>
+    ${lib.rules ? `<div class="lib-rules"><strong>Library rules:</strong> ${lib.rules}</div>` : ''}
+    <div class="lib-toolbar">
+      <input type="search" id="libSearch" placeholder="Search by title or author..." class="lib-search">
+      <div class="filter-pills" id="libSectionFilters">
+        <button type="button" class="filter-pill active" data-sec="all">All</button>
+        ${sections.map(s => `<button type="button" class="filter-pill" data-sec="${s.id}">${s.name}</button>`).join('')}
       </div>
     </div>
+    <div class="lib-grid" id="libGrid"></div>
+    <div id="libEmpty" class="coming-soon" style="display:none;"><div class="ic">📚</div>No books match your search.</div>
   `;
-  document.getElementById('libAddBtn').addEventListener('click', () => {
-    const name = document.getElementById('libItemName').value.trim();
-    if (!name) return;
-    const sectionId = document.getElementById('libItemSection').value;
-    const qty = +document.getElementById('libItemQty').value || 1;
-    const dbNow = loadDB();
-    dbNow.library.items.push({ id: uid('lib'), sectionId, name, qty });
-    saveDB(dbNow);
-    logAudit('super_admin', dbNow.owner.name, 'Added library item', name);
-    renderAdminLibrary();
+
+  const grid = document.getElementById('libGrid');
+  const empty = document.getElementById('libEmpty');
+  let activeSec = 'all';
+  let query = '';
+
+  function paint() {
+    const q = query.toLowerCase().trim();
+    const filtered = items.filter(it => {
+      if (activeSec !== 'all' && it.sectionId !== activeSec) return false;
+      if (!q) return true;
+      const hay = `${it.title || it.name || ''} ${it.author || ''}`.toLowerCase();
+      return hay.includes(q);
+    });
+    empty.style.display = filtered.length ? 'none' : 'block';
+    grid.innerHTML = filtered.map(it => {
+      const sec = sections.find(s => s.id === it.sectionId);
+      const avail = libAvailable(db, it);
+      const statusClass = avail > 0 ? 'lib-avail' : 'lib-out';
+      const statusText = avail > 0 ? `${avail} available` : 'All out';
+      return `
+        <div class="lib-card">
+          <div class="lib-card-icon">📖</div>
+          <div class="lib-card-title">${it.title || it.name || 'Untitled'}</div>
+          ${it.author ? `<div class="lib-card-author">${it.author}</div>` : ''}
+          <div class="lib-card-meta">${sec ? sec.name : 'Uncategorized'} · qty ${it.qty || 0}</div>
+          <div class="lib-card-status ${statusClass}">${statusText}</div>
+          ${it.notes ? `<div class="lib-card-notes">${it.notes}</div>` : ''}
+          <button type="button" class="icon-btn gold small lib-req-btn" data-req="${it.id}" ${avail < 1 ? 'disabled' : ''}>
+            ${avail > 0 ? 'Request Book' : 'Unavailable'}
+          </button>
+        </div>`;
+    }).join('');
+
+    grid.querySelectorAll('[data-req]').forEach(btn => {
+      btn.addEventListener('click', () => openLibRequest(btn.dataset.req));
+    });
+  }
+
+  document.getElementById('libSearch').addEventListener('input', e => {
+    query = e.target.value;
+    paint();
   });
-  document.querySelectorAll('[data-item]').forEach(btn => {
+  document.querySelectorAll('#libSectionFilters .filter-pill').forEach(btn => {
     btn.addEventListener('click', () => {
+      document.querySelectorAll('#libSectionFilters .filter-pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeSec = btn.dataset.sec;
+      paint();
+    });
+  });
+  paint();
+}
+
+function openLibRequest(itemId) {
+  const db = loadDB();
+  const item = (db.library.items || []).find(i => i.id === itemId);
+  if (!item) return;
+  const name = prompt('Your full name (required):');
+  if (!name || !name.trim()) return;
+  const phone = prompt('Phone number (required):') || '';
+  if (!phone.trim()) { alert('Phone is required so we can reach you.'); return; }
+  const message = prompt('Optional message (e.g. when you can pick up):') || '';
+  const dbNow = loadDB();
+  if (!dbNow.library.requests) dbNow.library.requests = [];
+  dbNow.library.requests.unshift({
+    id: uid('lreq'),
+    itemId,
+    itemTitle: item.title || item.name,
+    name: name.trim(),
+    phone: phone.trim(),
+    message: message.trim(),
+    at: new Date().toISOString(),
+    status: 'pending'
+  });
+  saveDB(dbNow);
+  logAudit('guest', name.trim(), 'Requested library book', item.title || item.name);
+  alert('Request sent! The library team will contact you.');
+  updateHeaderBellBadge(dbNow);
+  renderPublicLibrary(dbNow);
+}
+
+/* ---------- Library CMS (Admin) ---------- */
+function renderAdminLibrary() {
+  const db = loadDB();
+  const lib = db.library;
+  if (!lib.loans) lib.loans = [];
+  if (!lib.requests) lib.requests = [];
+  if (!lib.rules) lib.rules = '';
+
+  const pendingReq = (lib.requests || []).filter(r => r.status === 'pending');
+  const activeLoans = (lib.loans || []).filter(l => l.status === 'out');
+  const overdue = activeLoans.filter(l => l.dueAt && l.dueAt < new Date().toISOString().slice(0, 10));
+
+  document.getElementById('adminContent').innerHTML = `
+    <div class="admin-stats-grid">
+      ${adminStatCard('📚', 'Titles', lib.items.length)}
+      ${adminStatCard('📤', 'On Loan', activeLoans.length)}
+      ${adminStatCard('⚠️', 'Overdue', overdue.length)}
+      ${adminStatCard('📥', 'Requests', pendingReq.length)}
+    </div>
+
+    <div class="admin-subnav" id="libSubnav">
+      <button type="button" class="admin-subnav-btn active" data-libtab="catalog"><span class="ic">📖</span> Catalog</button>
+      <button type="button" class="admin-subnav-btn" data-libtab="loans"><span class="ic">📤</span> Loans</button>
+      <button type="button" class="admin-subnav-btn" data-libtab="requests"><span class="ic">📥</span> Requests ${pendingReq.length ? `<span class="badge-count inline">${pendingReq.length}</span>` : ''}</button>
+      <button type="button" class="admin-subnav-btn" data-libtab="sections"><span class="ic">🗂</span> Sections</button>
+      <button type="button" class="admin-subnav-btn" data-libtab="rules"><span class="ic">📋</span> Rules</button>
+    </div>
+    <div id="libSubContent"></div>
+  `;
+
+  const sub = document.getElementById('libSubContent');
+  document.querySelectorAll('#libSubnav .admin-subnav-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#libSubnav .admin-subnav-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      paintLibTab(btn.dataset.libtab);
+    });
+  });
+
+  function paintLibTab(tab) {
+    if (tab === 'catalog') paintCatalog();
+    else if (tab === 'loans') paintLoans();
+    else if (tab === 'requests') paintRequests();
+    else if (tab === 'sections') paintSections();
+    else if (tab === 'rules') paintRules();
+  }
+
+  function paintCatalog() {
+    sub.innerHTML = `
+      <div class="admin-panel">
+        <h3 class="admin-panel-title"><span class="ic">📖</span> Catalog</h3>
+        <div class="cms-list">
+          ${lib.items.map(it => {
+            const sec = lib.sections.find(s => s.id === it.sectionId);
+            const avail = libAvailable(db, it);
+            return `
+              <div class="cms-list-item">
+                <div>
+                  <strong>${it.title || it.name}</strong>
+                  ${it.author ? `<span class="muted small"> — ${it.author}</span>` : ''}
+                  <div class="muted small">${sec ? sec.name : 'Uncategorized'} · total ${it.qty} · available ${avail}${it.notes ? ' · ' + it.notes : ''}</div>
+                </div>
+                <div class="table-actions">
+                  <button type="button" class="icon-btn small" data-loanitem="${it.id}" ${avail < 1 ? 'disabled' : ''}>Loan out</button>
+                  <button type="button" class="mini-del" data-item="${it.id}">✕</button>
+                </div>
+              </div>`;
+          }).join('') || '<p class="muted">No items yet. Add your first book below.</p>'}
+        </div>
+        <div class="cms-add-row" style="flex-wrap:wrap;">
+          <input type="text" id="libTitle" placeholder="Title *">
+          <input type="text" id="libAuthor" placeholder="Author">
+          <select id="libSection">
+            ${lib.sections.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
+          </select>
+          <input type="number" id="libQty" placeholder="Qty" value="1" min="1" style="width:80px;flex:0;">
+          <input type="text" id="libNotes" placeholder="Notes (optional)">
+          <button type="button" class="icon-btn gold small" id="libAddBtn">+ Add Book</button>
+        </div>
+      </div>`;
+
+    document.getElementById('libAddBtn').addEventListener('click', () => {
+      const title = document.getElementById('libTitle').value.trim();
+      if (!title) { alert('Title is required.'); return; }
       const dbNow = loadDB();
-      dbNow.library.items = dbNow.library.items.filter(it => it.id !== btn.dataset.item);
+      dbNow.library.items.push({
+        id: uid('lib'),
+        sectionId: document.getElementById('libSection').value,
+        title,
+        name: title,
+        author: document.getElementById('libAuthor').value.trim(),
+        qty: +document.getElementById('libQty').value || 1,
+        notes: document.getElementById('libNotes').value.trim()
+      });
+      saveDB(dbNow);
+      logAudit('super_admin', dbNow.owner.name, 'Added library item', title);
+      renderAdminLibrary();
+    });
+    sub.querySelectorAll('[data-item]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!confirm('Remove this book from the catalog?')) return;
+        const dbNow = loadDB();
+        dbNow.library.items = dbNow.library.items.filter(it => it.id !== btn.dataset.item);
+        saveDB(dbNow);
+        renderAdminLibrary();
+      });
+    });
+    sub.querySelectorAll('[data-loanitem]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const itemId = btn.dataset.loanitem;
+        const borrowerName = prompt('Borrower full name:');
+        if (!borrowerName || !borrowerName.trim()) return;
+        const borrowerPhone = prompt('Borrower phone:') || '';
+        const due = libDueDate(14);
+        const dbNow = loadDB();
+        if (!dbNow.library.loans) dbNow.library.loans = [];
+        dbNow.library.loans.unshift({
+          id: uid('loan'),
+          itemId,
+          borrowerName: borrowerName.trim(),
+          borrowerPhone: borrowerPhone.trim(),
+          borrowedAt: new Date().toISOString().slice(0, 10),
+          dueAt: due,
+          returnedAt: null,
+          status: 'out'
+        });
+        saveDB(dbNow);
+        logAudit('super_admin', dbNow.owner.name, 'Loaned library item', borrowerName.trim());
+        alert(`Loaned out. Due: ${due}`);
+        updateHeaderBellBadge(dbNow);
+        renderAdminSidebar();
+        renderAdminLibrary();
+      });
+    });
+  }
+
+  function paintLoans() {
+    const loans = [...(lib.loans || [])].sort((a, b) => (a.status === 'out' ? 0 : 1) - (b.status === 'out' ? 0 : 1));
+    sub.innerHTML = `
+      <div class="admin-panel">
+        <h3 class="admin-panel-title"><span class="ic">📤</span> Loans</h3>
+        ${loans.filter(l => l.status === 'out' && l.dueAt && l.dueAt < new Date().toISOString().slice(0, 10)).length ? `
+          <div class="lib-overdue-banner">⚠ ${loans.filter(l => l.status === 'out' && l.dueAt && l.dueAt < new Date().toISOString().slice(0, 10)).length} overdue loan(s) — follow up with the borrower.</div>
+        ` : ''}
+        <div class="cms-list">
+          ${loans.map(l => {
+            const item = lib.items.find(i => i.id === l.itemId);
+            const today = new Date().toISOString().slice(0, 10);
+            const overdueFlag = l.status === 'out' && l.dueAt && l.dueAt < today;
+            let daysHeld = 0;
+            if (l.borrowedAt) {
+              const end = l.returnedAt || today;
+              daysHeld = Math.max(0, Math.round((new Date(end) - new Date(l.borrowedAt)) / 86400000));
+            }
+            return `
+              <div class="cms-list-item ${overdueFlag ? 'lib-overdue-row' : ''}">
+                <div>
+                  <strong>${item ? (item.title || item.name) : 'Unknown book'}</strong>
+                  <div class="muted small">${l.borrowerName}${l.borrowerPhone ? ' · ' + l.borrowerPhone : ''} · out ${l.borrowedAt} · due ${l.dueAt || '—'} · <strong>${daysHeld} day${daysHeld === 1 ? '' : 's'} held</strong></div>
+                </div>
+                <div class="table-actions">
+                  ${overdueFlag ? '<span class="status-badge status-pending">⚠ Overdue</span>' : ''}
+                  ${l.status === 'out'
+                    ? `<button type="button" class="icon-btn small gold" data-return="${l.id}">Mark Returned</button>`
+                    : `<span class="status-badge status-checked-out">Returned ${l.returnedAt || ''}</span>`}
+                </div>
+              </div>`;
+          }).join('') || '<p class="muted">No loans recorded yet.</p>'}
+        </div>
+      </div>`;
+    sub.querySelectorAll('[data-return]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const dbNow = loadDB();
+        const loan = dbNow.library.loans.find(l => l.id === btn.dataset.return);
+        if (!loan) return;
+        loan.status = 'returned';
+        loan.returnedAt = new Date().toISOString().slice(0, 10);
+        saveDB(dbNow);
+        logAudit('super_admin', dbNow.owner.name, 'Returned library item', loan.borrowerName);
+        updateHeaderBellBadge(dbNow);
+        renderAdminSidebar();
+        renderAdminLibrary();
+      });
+    });
+  }
+
+  function paintRequests() {
+    const reqs = lib.requests || [];
+    sub.innerHTML = `
+      <div class="admin-panel">
+        <h3 class="admin-panel-title"><span class="ic">📥</span> Book Requests</h3>
+        <div class="cms-list">
+          ${reqs.map(r => `
+            <div class="cms-list-item">
+              <div>
+                <strong>${r.itemTitle || 'Book'}</strong>
+                <div class="muted small">${r.name} · ${r.phone} · ${new Date(r.at).toLocaleDateString()}${r.message ? ' · "' + r.message + '"' : ''}</div>
+              </div>
+              <div class="table-actions">
+                <span class="status-badge status-${r.status === 'pending' ? 'pending' : r.status === 'fulfilled' ? 'checked-in' : 'checked-out'}">${r.status}</span>
+                ${r.status === 'pending' ? `
+                  <button type="button" class="icon-btn small gold" data-fulfill="${r.id}">Fulfill</button>
+                  <button type="button" class="icon-btn small" data-decline="${r.id}">Decline</button>
+                ` : ''}
+              </div>
+            </div>`).join('') || '<p class="muted">No requests yet.</p>'}
+        </div>
+      </div>`;
+    sub.querySelectorAll('[data-fulfill]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const dbNow = loadDB();
+        const r = dbNow.library.requests.find(x => x.id === btn.dataset.fulfill);
+        if (!r) return;
+        r.status = 'fulfilled';
+        // auto-create loan
+        if (!dbNow.library.loans) dbNow.library.loans = [];
+        dbNow.library.loans.unshift({
+          id: uid('loan'),
+          itemId: r.itemId,
+          borrowerName: r.name,
+          borrowerPhone: r.phone,
+          borrowedAt: new Date().toISOString().slice(0, 10),
+          dueAt: libDueDate(14),
+          returnedAt: null,
+          status: 'out'
+        });
+        saveDB(dbNow);
+        alert('Request fulfilled and loan recorded.');
+        updateHeaderBellBadge(loadDB());
+        renderAdminSidebar();
+        renderAdminLibrary();
+      });
+    });
+    sub.querySelectorAll('[data-decline]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const dbNow = loadDB();
+        const r = dbNow.library.requests.find(x => x.id === btn.dataset.decline);
+        if (r) r.status = 'declined';
+        saveDB(dbNow);
+        updateHeaderBellBadge(dbNow);
+        renderAdminSidebar();
+        renderAdminLibrary();
+      });
+    });
+  }
+
+  function paintSections() {
+    sub.innerHTML = `
+      <div class="admin-panel">
+        <h3 class="admin-panel-title"><span class="ic">🗂</span> Sections</h3>
+        <div class="cms-list">
+          ${lib.sections.map(s => `
+            <div class="cms-list-item">
+              <div><strong>${s.name}</strong></div>
+              <button type="button" class="mini-del" data-sec="${s.id}">✕</button>
+            </div>`).join('') || '<p class="muted">No sections.</p>'}
+        </div>
+        <div class="cms-add-row">
+          <input type="text" id="libNewSec" placeholder="New section name">
+          <button type="button" class="icon-btn gold small" id="libAddSecBtn">+ Add Section</button>
+        </div>
+      </div>`;
+    document.getElementById('libAddSecBtn').addEventListener('click', () => {
+      const name = document.getElementById('libNewSec').value.trim();
+      if (!name) return;
+      const dbNow = loadDB();
+      dbNow.library.sections.push({ id: uid('sec'), name });
       saveDB(dbNow);
       renderAdminLibrary();
     });
-  });
+    sub.querySelectorAll('[data-sec]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!confirm('Delete this section? Books keep their sectionId but will show as Uncategorized.')) return;
+        const dbNow = loadDB();
+        dbNow.library.sections = dbNow.library.sections.filter(s => s.id !== btn.dataset.sec);
+        saveDB(dbNow);
+        renderAdminLibrary();
+      });
+    });
+  }
+
+  function paintRules() {
+    sub.innerHTML = `
+      <div class="admin-panel">
+        <h3 class="admin-panel-title"><span class="ic">📋</span> Library Rules</h3>
+        <p class="muted small" style="margin-bottom:12px;">Shown on the public Library page.</p>
+        <div class="form-field">
+          <textarea id="libRulesText" rows="4">${lib.rules || ''}</textarea>
+        </div>
+        <button type="button" class="icon-btn gold" id="libSaveRules"><span class="ic">💾</span> Save Rules</button>
+      </div>`;
+    document.getElementById('libSaveRules').addEventListener('click', () => {
+      const dbNow = loadDB();
+      dbNow.library.rules = document.getElementById('libRulesText').value.trim();
+      saveDB(dbNow);
+      alert('Rules saved.');
+      renderAdminLibrary();
+    });
+  }
+
+  paintLibTab('catalog');
 }
 
-/* ---------- Contact CMS (view submissions) ---------- */
+
 function renderAdminContact() {
   const db = loadDB();
   const c = db.contact;
@@ -1931,6 +3159,109 @@ function renderAdminContact() {
     renderContactPublic(dbNow);
     alert('Contact settings saved.');
   });
+}
+
+/* ============================================================
+   REPORT TAB — system-wide SVG dashboard + Portal Control
+   ============================================================ */
+function renderAdminReport() {
+  const db = loadDB();
+  const stats = [
+    { label: 'Received', value: db.contactSubmissions.length + db.messages.filter(m => m.toRole === 'super_admin').length, color: '#5b7cf0' },
+    { label: 'Send', value: db.messages.filter(m => m.fromRole === 'super_admin').length, color: 'var(--gold)' },
+    { label: 'Tour', value: TOUR_GROUP_ORDER.reduce((s, k) => s + (db.tour.groups[k] || []).length, 0) + TOUR_SINGLES.filter(v => db.tour.singles[v.key]).length, color: '#4caf6e' },
+    { label: 'Project', value: PROJECT_STAGE_ORDER.reduce((s, k) => s + (db.project[k]?.media.length || 0), 0), color: '#e8b34c' },
+    { label: 'Katoloni Wall', value: db.graduates.length, color: '#c23f8a' },
+    { label: 'Booking', value: db.booking.bookings.length, color: '#f0a15b' },
+    { label: 'Library', value: db.library.items.length, color: '#8a6ae0' },
+    { label: 'Contact', value: db.contactSubmissions.length, color: '#e8607a' }
+  ];
+
+  document.getElementById('adminContent').innerHTML = `
+    <div class="admin-panel">
+      <h3 class="admin-panel-title"><span class="ic">📊</span> System Overview</h3>
+      ${svgBarChartHTML(stats, 760, 260)}
+      <div class="admin-stats-grid" style="margin-top:18px;">
+        ${stats.map(s => adminStatCard('📌', s.label, s.value)).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderAdminPortalControl() {
+  const db = loadDB();
+  document.getElementById('adminContent').innerHTML = `
+    <div class="admin-panel">
+      <h3 class="admin-panel-title"><span class="ic">🗂</span> Portal Control</h3>
+      <p class="muted" style="margin-bottom:18px;">Manage the Protocol and Disciple Class portals. <strong>View</strong> checks status only, with no editing. <strong>Update</strong> opens that portal's sections for you to edit directly.</p>
+      <div class="portal-cards-grid">
+        ${['bishop', 'protocol', 'disciple1', 'disciple2', 'disciple3'].map(key => portalControlCardHTML(db, key)).join('')}
+      </div>
+    </div>
+  `;
+  document.querySelectorAll('[data-portalview]').forEach(btn => {
+    btn.addEventListener('click', () => openPortalViewModal(btn.dataset.portalview));
+  });
+  document.querySelectorAll('[data-portalupdate]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activePortalKey = btn.dataset.portalupdate;
+      adminEditingPortal = true;
+      memberActiveTab = 'profile';
+      setAdminPortalTitle(`${PORTAL_DEFS[activePortalKey].label} Portal (Admin Editing)`, PORTAL_DEFS[activePortalKey].icon);
+      renderMemberSidebar();
+      switchMemberTab('profile');
+    });
+  });
+}
+
+function portalControlCardHTML(db, key) {
+  const profile = db.portalProfiles[key];
+  const hasPasscode = db.passcodes.some(p => p.role === key && !p.revoked);
+  return `
+    <div class="portal-card">
+      <div class="portal-card-avatar">
+        ${profile.photo ? `<img src="${profile.photo}">` : `<span>${PORTAL_DEFS[key].icon}</span>`}
+      </div>
+      <div class="portal-card-name">${PORTAL_DEFS[key].label}</div>
+      <div class="portal-card-status ${hasPasscode ? 'linked' : 'unlinked'}">${hasPasscode ? 'Passcode Issued' : 'No Passcode Yet'}</div>
+      <div class="portal-card-actions">
+        <button type="button" class="icon-btn small" data-portalview="${key}"><span class="ic">👁</span> View</button>
+        <button type="button" class="icon-btn small gold" data-portalupdate="${key}"><span class="ic">✏️</span> Update</button>
+      </div>
+    </div>
+  `;
+}
+
+function openPortalViewModal(key) {
+  const db = loadDB();
+  const profile = db.portalProfiles[key];
+  const sent = db.messages.filter(m => m.fromRole === key).length;
+  const received = db.messages.filter(m => m.toRole === key).length;
+  const complaints = db.complaints.filter(c => c.fromRole === key).length;
+  const passcodeRec = db.passcodes.find(p => p.role === key && !p.revoked);
+  document.getElementById('adminContent').innerHTML = `
+    <div class="admin-panel">
+      <button type="button" class="icon-btn small" id="portalViewBackBtn" style="margin-bottom:16px;"><span class="ic">←</span> Back to Portal Control</button>
+      <h3 class="admin-panel-title"><span class="ic">👁</span> ${PORTAL_DEFS[key].label} — Status (Read-only)</h3>
+      <div class="profile-grid">
+        <div class="avatar-upload">
+          <div class="avatar-preview">${profile.photo ? `<img src="${profile.photo}">` : `<span>${PORTAL_DEFS[key].icon}</span>`}</div>
+        </div>
+        <div class="form-fields">
+          <p class="muted">Leader: <strong style="color:var(--text-hi);">${profile.name || '—'}</strong></p>
+          <p class="muted">Phone: ${profile.phone || '—'}</p>
+          <p class="muted">Email: ${profile.email || '—'}</p>
+          <p class="muted">Passcode: ${passcodeRec ? passcodeRec.code : 'Not yet generated'}</p>
+        </div>
+      </div>
+      <div class="admin-stats-grid" style="margin-top:20px;">
+        ${adminStatCard('📤', 'Sent', sent)}
+        ${adminStatCard('📥', 'Received', received)}
+        ${adminStatCard('⚠️', 'Complaints', complaints)}
+      </div>
+    </div>
+  `;
+  document.getElementById('portalViewBackBtn').addEventListener('click', () => switchAdminTab('portalControl'));
 }
 
 /* ============================================================

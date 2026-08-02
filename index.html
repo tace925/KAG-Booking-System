@@ -36,7 +36,17 @@
     </div>
 
     <div class="header-actions">
-      <button class="icon-btn" id="menuBtn"><span class="ic">☰</span> Menu</button>
+      <div class="menu-dropdown-wrap" id="menuDropdownWrap">
+        <button class="icon-btn" id="menuBtn"><span class="ic">☰</span> Menu</button>
+        <div class="menu-dropdown" id="menuDropdown">
+          <button type="button" class="menu-dropdown-item" data-portal="admin"><span class="ic">🔑</span> Admin Portal</button>
+          <button type="button" class="menu-dropdown-item" data-portal="bishop"><span class="ic">✝</span> Bishop</button>
+          <button type="button" class="menu-dropdown-item" data-portal="protocol"><span class="ic">🛎</span> Protocol</button>
+          <button type="button" class="menu-dropdown-item" data-portal="disciple1"><span class="ic">📖</span> Disciple Class 1</button>
+          <button type="button" class="menu-dropdown-item" data-portal="disciple2"><span class="ic">📖</span> Disciple Class 2</button>
+          <button type="button" class="menu-dropdown-item" data-portal="disciple3"><span class="ic">📖</span> Disciple Class 3</button>
+        </div>
+      </div>
       <button class="icon-btn bell-btn" id="headerBellBtn"><span class="ic">🔔</span><span class="badge-count" id="headerBellCount" style="display:none;">0</span></button>
       <button class="icon-btn" id="settingsBtn"><span class="ic">⚙</span> Settings / Help</button>
       <button class="theme-toggle" id="themeToggle" title="Toggle dark / light mode">🌙</button>
@@ -102,8 +112,7 @@
   <section class="page-section" id="sec-project">
     <div class="section-eyebrow">Building the house</div>
     <h2 class="section-title">The Project</h2>
-    <p class="section-lede">How the church looked before, how it looks now, and what's planned next.</p>
-    <div class="coming-soon"><div class="ic">🏗</div>Past / Present / Upcoming media sections build next.</div>
+    <div id="projectContent"></div>
   </section>
 
   <!-- ================= NOTICE BOARD ================= -->
@@ -118,7 +127,7 @@
     <div class="section-eyebrow">Discipleship</div>
     <h2 class="section-title">Katoloni Wall</h2>
     <p class="section-lede">Graduates of the discipleship classes.</p>
-    <div class="coming-soon"><div class="ic">👥</div>Graduate wall + name/class filter builds next.</div>
+    <div id="wallContent"></div>
   </section>
 
   <!-- ================= BOOKING ================= -->
@@ -232,7 +241,7 @@
   <section class="page-section" id="sec-library">
     <div class="section-eyebrow">Resources</div>
     <h2 class="section-title">Library</h2>
-    <div class="coming-soon"><div class="ic">📚</div>Searchable library catalog builds next.</div>
+    <div id="libraryContent"></div>
   </section>
 
   <!-- ================= CONTACT ================= -->
@@ -296,11 +305,11 @@
 <footer class="site-footer">
   <div class="wrap footer-row">
     <div>© 2026 Mountain of the Lord Prayer Center, Katoloni. All rights reserved. | <a href="#">Privacy Policy</a> | <a href="#">Terms &amp; Conditions</a></div>
-    <div class="footer-credit"><span class="tag">&lt;/&gt;</span> Crafted by Tevin Mulinge | 0797510552</div>
+    <div class="footer-credit"><span class="tag">&lt;/&gt;</span> Crafted by <a href="https://tevin-tec.vercel.app/" target="_blank" rel="noopener">TEVINTECH</a> | 0797510552</div>
   </div>
 </footer>
 
-<!-- ================= PASSCODE GATE (Menu → Admin) ================= -->
+<!-- ================= PASSCODE GATE ================= -->
 <div class="passcode-overlay" id="passcodeOverlay">
   <div class="passcode-box">
     <h3><span class="ic">🔑</span> Admin Access</h3>
