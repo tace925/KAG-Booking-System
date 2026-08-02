@@ -1,219 +1,364 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KAG Guest House - Book a Room</title>
-    <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mountain of the Lord Prayer Center — Katoloni</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="app">
-        <!-- Header -->
-        <header class="header">
-            <div class="header-content">
-                <div class="logo-section">
-                    <div class="hamburger" id="hamburger">
-                        <i class="fas fa-bars"></i>
-                    </div>
-                    <div class="logo">
-                        <h1><span class="kag-highlight">KAG</span></h1>
-                        <p class="logo-sub">Kenya Assemblies of God</p>
-                        <p class="logo-tagline">Guest House & Booking System</p>
-                    </div>
-                </div>
-                <div class="header-actions">
-                    <button class="theme-toggle" id="themeToggle">
-                        <i class="fas fa-moon"></i>
-                    </button>
-                    <a href="admin.html" class="admin-link">
-                        <i class="fas fa-lock"></i> Admin
-                    </a>
-                </div>
-            </div>
-        </header>
 
-        <!-- Mobile Sidebar -->
-        <div class="sidebar" id="sidebar">
-            <div class="sidebar-header">
-                <h3>Menu</h3>
-                <button class="close-sidebar" id="closeSidebar">&times;</button>
-            </div>
-            <ul class="sidebar-menu">
-                <li><a href="index.html" class="active"><i class="fas fa-home"></i> Home</a></li>
-                <li><a href="#" id="scrollToRooms"><i class="fas fa-bed"></i> Rooms</a></li>
-                <li><a href="#" id="scrollToBooking"><i class="fas fa-calendar-check"></i> Book Now</a></li>
-                <li><a href="admin.html"><i class="fas fa-chart-line"></i> Admin Dashboard</a></li>
-            </ul>
-        </div>
-
-        <!-- Overlay -->
-        <div class="overlay" id="overlay"></div>
-
-        <!-- Hero Section with Typing Animation -->
-        <section class="hero">
-            <div class="hero-content">
-                <div class="typing-container">
-                    <h2 id="typingText"></h2>
-                </div>
-                <p>Find rest and peace in our comfortable accommodations</p>
-                <button class="btn-primary" id="heroBookBtn">Book a Room <i class="fas fa-arrow-right"></i></button>
-            </div>
-        </section>
-
-        <!-- Rooms Section -->
-        <section class="rooms-section" id="roomsSection">
-            <div class="container">
-                <h2 class="section-title"><i class="fas fa-bed"></i> Our Rooms & Rates</h2>
-                <div class="rooms-grid" id="roomsGrid"></div>
-            </div>
-        </section>
-
-        <!-- Booking Form Section -->
-        <section class="booking-section" id="bookingSection">
-            <div class="container">
-                <h2 class="section-title"><i class="fas fa-calendar-alt"></i> Book Your Stay</h2>
-                <div class="booking-container">
-                    <form id="bookingForm">
-                        <!-- Room Selection -->
-                        <div class="form-group">
-                            <label><i class="fas fa-hotel"></i> Select Room Type *</label>
-                            <select id="roomType" required>
-                                <option value="">-- Select Room --</option>
-                            </select>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label><i class="fas fa-calendar-check"></i> Check-in Date *</label>
-                                <input type="date" id="checkIn" required>
-                            </div>
-                            <div class="form-group">
-                                <label><i class="fas fa-calendar-times"></i> Check-out Date *</label>
-                                <input type="date" id="checkOut" required>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label><i class="fas fa-users"></i> Number of Guests *</label>
-                            <input type="number" id="guests" min="1" max="10" value="1" required>
-                        </div>
-
-                        <div class="form-group">
-                            <label><i class="fas fa-user"></i> Full Name *</label>
-                            <input type="text" id="guestName" placeholder="Enter your full name" required>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label><i class="fas fa-phone"></i> Phone Number *</label>
-                                <input type="tel" id="phone" placeholder="07XX XXX XXX" required>
-                            </div>
-                            <div class="form-group">
-                                <label><i class="fas fa-envelope"></i> Email (Optional)</label>
-                                <input type="email" id="email" placeholder="your@email.com">
-                            </div>
-                        </div>
-
-                        <!-- Items Request -->
-                        <div class="form-group">
-                            <label><i class="fas fa-tshirt"></i> Request Items</label>
-                            <div class="items-checkbox-group" id="itemsCheckbox"></div>
-                            <small class="form-hint">1 blanket is provided free. Extra blankets cost 10 KES/night each</small>
-                        </div>
-
-                        <!-- Extra Blanket Option -->
-                        <div class="form-group" id="extraBlanketGroup" style="display: none;">
-                            <label><i class="fas fa-blanket"></i> Extra Blankets (10 KES/night each)</label>
-                            <input type="number" id="extraBlankets" min="0" max="5" value="0">
-                            <small class="form-hint">Each extra blanket costs 10 KES per night of your stay</small>
-                        </div>
-
-                        <!-- Payment Section - M-Pesa Only -->
-                        <div class="payment-section">
-                            <h3><i class="fas fa-phone-alt"></i> M-Pesa Payment</h3>
-                            <div class="payment-details">
-                                <div class="payment-card">
-                                    <i class="fas fa-mobile-alt"></i>
-                                    <h4>M-Pesa Number 1</h4>
-                                    <p class="payment-number">0704323654</p>
-                                    <small>Send payment via M-Pesa</small>
-                                </div>
-                                <div class="payment-card">
-                                    <i class="fas fa-mobile-alt"></i>
-                                    <h4>M-Pesa Number 2</h4>
-                                    <p class="payment-number">0704323654</p>
-                                    <small>Alternative number</small>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label><i class="fas fa-receipt"></i> M-Pesa Transaction ID *</label>
-                                <input type="text" id="transactionId" placeholder="e.g., QWER12TYUIO" required>
-                                <small class="form-hint">Enter the confirmation code from M-Pesa message</small>
-                            </div>
-                        </div>
-
-                        <!-- Bishop's Number Section -->
-                        <div class="bishop-section">
-                            <i class="fas fa-church"></i>
-                            <div class="bishop-info">
-                                <h4>Bishop's Contact</h4>
-                                <p class="bishop-number">📞 0721514653</p>
-                                <small>For church matters and spiritual support</small>
-                            </div>
-                        </div>
-
-                        <!-- Price Summary -->
-                        <div class="price-summary" id="priceSummary">
-                            <h3>Booking Summary</h3>
-                            <div class="summary-details">
-                                <p>Room rate: <span id="roomRate">KES 0</span> <span id="ratePer">per day</span></p>
-                                <p>Number of nights: <span id="totalDays">0</span></p>
-                                <p>Free blanket: <span id="freeBlanket">1 included</span> <i class="fas fa-info-circle" title="1 blanket provided free per guest"></i></p>
-                                <p id="extraBlanketRow" style="display: none;">Extra blankets: <span id="extraBlanketCount">0</span> × 10 KES/night = <span id="extraBlanketCost">KES 0</span></p>
-                                <p class="total-price">Total Amount: <span id="totalAmount">KES 0</span></p>
-                            </div>
-                        </div>
-
-                        <button type="submit" class="btn-submit">
-                            <i class="fas fa-check-circle"></i> Complete Booking
-                        </button>
-                    </form>
-
-                    <!-- Check My Booking -->
-                    <div class="check-booking-section" style="margin-top:2rem; padding:1.5rem; background:#1a1a1a; border-radius:12px; border:1px solid #333;">
-                        <h3 style="color:#fff; margin-bottom:1rem;"><i class="fas fa-search"></i> Check My Booking</h3>
-                        <div style="display:flex; gap:1rem; flex-wrap:wrap;">
-                            <input type="text" id="searchGuestName" placeholder="Enter your full name..." 
-                                style="flex:1; padding:0.8rem; border-radius:8px; border:1px solid #444; background:#111; color:#fff; font-size:1rem;">
-                            <button onclick="searchBookingByName()" 
-                                style="padding:0.8rem 1.5rem; background:#c0392b; color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:1rem;">
-                                <i class="fas fa-search"></i> Search
-                            </button>
-                        </div>
-                        <div id="bookingSearchResults" style="margin-top:1rem;"></div>
-                    </div>
-
-                </div>
-            </div>
-        </section>
-
-        <!-- Canteen Animation Section -->
-        <div class="canteen-animation">
-            <div class="canteen-text" id="canteenText"></div>
-        </div>
-
-        <!-- Footer -->
-        <footer class="footer">
-            <div class="container">
-                <p>Crafted by Tevin Mulinge | 0743936403</p>
-                <p class="footer-verse">"Come to me, all you who are weary and burdened, and I will give you rest." - Matthew 11:28</p>
-            </div>
-        </footer>
+<!-- ================= HEADER ================= -->
+<header class="site-header">
+  <div class="header-row">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 100 122" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="shieldGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#f4cd7c"/>
+            <stop offset="100%" stop-color="#3a2b0c"/>
+          </linearGradient>
+          <linearGradient id="bannerGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#2a2110"/>
+            <stop offset="100%" stop-color="#161006"/>
+          </linearGradient>
+        </defs>
+        <rect x="6" y="2" width="88" height="20" rx="3" fill="url(#bannerGrad)" stroke="#e8b34c" stroke-width="1.6"/>
+        <text x="50" y="16" text-anchor="middle" font-family="Karla, sans-serif" font-weight="800" font-size="10" letter-spacing="1" fill="#e8b34c">KAG</text>
+        <path d="M50 26 L92 36 V70 C92 96 74 112 50 120 C26 112 8 96 8 70 V36 Z" fill="url(#shieldGrad)" stroke="#e8b34c" stroke-width="2.5"/>
+        <path d="M32 52 L50 45 L68 52 V60 L50 53 L32 60 Z" fill="#2a2110" opacity=".85"/>
+        <text x="50" y="96" text-anchor="middle" font-family="Cormorant Garamond, serif" font-weight="700" font-size="34" fill="#2a2110">AG</text>
+      </svg>
+      <div class="brand-text">
+        <div class="name-top">Mountain of the Lord</div>
+        <div class="name-sub">Prayer Center · Katoloni</div>
+      </div>
     </div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="script.js"></script>
-    
+
+    <div class="header-actions">
+      <button class="icon-btn" id="menuBtn"><span class="ic">☰</span> Menu</button>
+      <button class="icon-btn bell-btn" id="headerBellBtn"><span class="ic">🔔</span><span class="badge-count" id="headerBellCount" style="display:none;">0</span></button>
+      <button class="icon-btn" id="settingsBtn"><span class="ic">⚙</span> Settings / Help</button>
+      <button class="theme-toggle" id="themeToggle" title="Toggle dark / light mode">🌙</button>
+    </div>
+  </div>
+
+  <nav class="main-nav">
+    <div class="nav-row" id="navRow">
+      <button class="nav-btn active" data-section="home"><span class="ic">🏠</span> Home</button>
+      <button class="nav-btn" data-section="tour"><span class="ic">🗺</span> Tour</button>
+      <button class="nav-btn" data-section="project"><span class="ic">🏗</span> Project</button>
+      <button class="nav-btn" data-section="notices"><span class="ic">📢</span> Notice Board</button>
+      <button class="nav-btn" data-section="wall"><span class="ic">👥</span> Katoloni Wall</button>
+      <button class="nav-btn" data-section="booking"><span class="ic">🛏</span> Booking</button>
+      <button class="nav-btn" data-section="library"><span class="ic">📚</span> Library</button>
+      <button class="nav-btn" data-section="contact"><span class="ic">✉</span> Contact</button>
+    </div>
+  </nav>
+</header>
+
+<main class="wrap">
+
+  <!-- ================= HOME ================= -->
+  <section class="page-section active" id="sec-home">
+    <div class="hero">
+      <div class="hero-glow"></div>
+      <svg class="hero-crest" viewBox="0 0 100 122" xmlns="http://www.w3.org/2000/svg">
+        <rect x="6" y="2" width="88" height="20" rx="3" fill="#161006" stroke="#e8b34c" stroke-width="1.4"/>
+        <text x="50" y="16" text-anchor="middle" font-family="Karla, sans-serif" font-weight="800" font-size="10" letter-spacing="1" fill="#e8b34c">KAG</text>
+        <path d="M50 26 L92 36 V70 C92 96 74 112 50 120 C26 112 8 96 8 70 V36 Z" fill="none" stroke="#e8b34c" stroke-width="2"/>
+        <path d="M32 52 L50 45 L68 52 V60 L50 53 L32 60 Z" fill="#e8b34c"/>
+        <text x="50" y="96" text-anchor="middle" font-family="Cormorant Garamond, serif" font-weight="700" font-size="30" fill="#e8b34c">AG</text>
+      </svg>
+      <div class="typing-line"><span id="typingText"></span><span class="cursor">&nbsp;</span></div>
+      <div class="hero-sub">A house of prayer for Katoloni and all who seek it</div>
+    </div>
+
+    <div class="divider"><span class="d-line"></span><span class="d-diamond"></span><span class="d-line"></span></div>
+    <div class="section-eyebrow" style="text-align:center;">Our Leadership</div>
+
+    <div class="pyramid" id="leadershipPyramid"></div>
+
+    <div class="loop-band">
+      <div class="loop-text">
+        <h3>📬 Stay in the Loop</h3>
+        <p>Get the latest news, service times and announcements from Mountain of the Lord delivered straight to you.</p>
+      </div>
+      <div class="loop-socials">
+        <a class="social-btn fb" href="https://facebook.com" target="_blank" rel="noopener"><span>📘</span> Facebook</a>
+        <a class="social-btn ig" href="https://instagram.com" target="_blank" rel="noopener"><span>📷</span> Instagram</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TOUR ================= -->
+  <section class="page-section" id="sec-tour">
+    <div class="section-eyebrow">Around the church</div>
+    <h2 class="section-title">Tour the Church</h2>
+    <div id="tourContent"></div>
+  </section>
+
+  <!-- ================= PROJECT ================= -->
+  <section class="page-section" id="sec-project">
+    <div class="section-eyebrow">Building the house</div>
+    <h2 class="section-title">The Project</h2>
+    <p class="section-lede">How the church looked before, how it looks now, and what's planned next.</p>
+    <div class="coming-soon"><div class="ic">🏗</div>Past / Present / Upcoming media sections build next.</div>
+  </section>
+
+  <!-- ================= NOTICE BOARD ================= -->
+  <section class="page-section" id="sec-notices">
+    <div class="section-eyebrow">2026</div>
+    <h2 class="section-title">Global Notice Board</h2>
+    <div id="noticeboardContent"></div>
+  </section>
+
+  <!-- ================= WALL ================= -->
+  <section class="page-section" id="sec-wall">
+    <div class="section-eyebrow">Discipleship</div>
+    <h2 class="section-title">Katoloni Wall</h2>
+    <p class="section-lede">Graduates of the discipleship classes.</p>
+    <div class="coming-soon"><div class="ic">👥</div>Graduate wall + name/class filter builds next.</div>
+  </section>
+
+  <!-- ================= BOOKING ================= -->
+  <section class="page-section" id="sec-booking">
+    <div class="section-eyebrow">Guest House</div>
+    <h2 class="section-title">Booking</h2>
+    <p class="section-lede">Comfortable accommodation for visitors and guests of Mountain of the Lord.</p>
+
+    <div class="booking-block">
+      <h3 class="admin-panel-title"><span class="ic">🛏</span> Our Rooms &amp; Rates</h3>
+      <div id="roomsGrid"><p class="muted">Loading rooms...</p></div>
+    </div>
+
+    <div class="booking-form-panel">
+      <h3 class="admin-panel-title"><span class="ic">📅</span> Book Your Stay</h3>
+
+      <div class="form-field">
+        <label>🏨 Select Room Type *</label>
+        <select id="bookRoomSelect"><option value="">-- Select Room --</option></select>
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label>📅 Check-in Date *</label>
+          <input type="date" id="bookCheckin">
+        </div>
+        <div class="form-field">
+          <label>📅 Check-out Date *</label>
+          <input type="date" id="bookCheckout">
+        </div>
+      </div>
+      <div class="form-field">
+        <label>👥 Number of Guests *</label>
+        <input type="number" id="bookGuests" value="1" min="1">
+      </div>
+      <div class="form-field">
+        <label>👤 Full Name *</label>
+        <input type="text" id="bookFullName" placeholder="Enter your full name">
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label>📞 Phone Number *</label>
+          <input type="text" id="bookPhone" placeholder="07XX XXX XXX">
+        </div>
+        <div class="form-field">
+          <label>✉ Email (Optional)</label>
+          <input type="text" id="bookEmail" placeholder="your@email.com">
+        </div>
+      </div>
+      <div class="form-field">
+        <label>👕 Request Items</label>
+        <div id="requestItemsList" class="request-items-list"></div>
+      </div>
+
+      <div class="mpesa-panel">
+        <h4><span class="ic">📞</span> M-Pesa Payment</h4>
+        <div class="mpesa-numbers">
+          <div class="mpesa-card">
+            <div class="ic">📱</div>
+            <div class="mpesa-label">M-Pesa Number 1</div>
+            <div class="mpesa-number" id="mpesaPrimary">—</div>
+            <div class="muted small">Send payment via M-Pesa</div>
+          </div>
+          <div class="mpesa-card">
+            <div class="ic">📱</div>
+            <div class="mpesa-label">M-Pesa Number 2</div>
+            <div class="mpesa-number" id="mpesaAlt">—</div>
+            <div class="muted small">Alternative number</div>
+          </div>
+        </div>
+        <div class="form-field">
+          <label>🧾 M-Pesa Transaction ID *</label>
+          <input type="text" id="bookMpesaTxn" placeholder="e.g., QWER12TYUIO">
+          <div class="muted small">Enter the confirmation code from M-Pesa message</div>
+        </div>
+      </div>
+
+      <div class="bishop-contact-band">
+        <div class="ic">⛪</div>
+        <div>
+          <div class="bishop-title">Bishop's Contact</div>
+          <div class="bishop-phone">📞 <span id="bishopPhone">—</span></div>
+          <div class="muted small" id="bishopNote"></div>
+        </div>
+      </div>
+
+      <div class="booking-summary">
+        <h4>Booking Summary</h4>
+        <div class="summary-row"><span>Room rate:</span> <span id="summaryRate">KES 0</span> <span class="muted small">per day</span></div>
+        <div class="summary-row"><span>Number of nights:</span> <span id="summaryNights">0</span></div>
+        <div class="summary-row"><span>Free blanket:</span> <span id="summaryBlanket">1 included</span> <span class="info-dot" title="1 blanket is provided free. Extra blankets cost 10 KES/night each">ⓘ</span></div>
+        <hr>
+        <div class="summary-total">Total Amount: <span id="summaryTotal">KES 0</span></div>
+      </div>
+
+      <button type="button" class="complete-booking-btn" id="completeBookingBtn"><span class="ic">✔</span> Complete Booking</button>
+    </div>
+
+    <div class="check-booking-panel">
+      <h3 class="admin-panel-title"><span class="ic">🔍</span> Check My Booking</h3>
+      <div class="check-booking-row">
+        <input type="text" id="checkBookingName" placeholder="Enter your full name...">
+        <button type="button" class="icon-btn gold" id="checkBookingBtn"><span class="ic">🔍</span> Search</button>
+      </div>
+      <div id="checkBookingResults"></div>
+    </div>
+
+    <div class="canteen-banner">🍽 Canteen Available on-site 🍽</div>
+  </section>
+
+  <!-- ================= LIBRARY ================= -->
+  <section class="page-section" id="sec-library">
+    <div class="section-eyebrow">Resources</div>
+    <h2 class="section-title">Library</h2>
+    <div class="coming-soon"><div class="ic">📚</div>Searchable library catalog builds next.</div>
+  </section>
+
+  <!-- ================= CONTACT ================= -->
+  <section class="page-section" id="sec-contact">
+    <div class="section-eyebrow">Reach us</div>
+    <h2 class="section-title">Contact Us</h2>
+
+    <div class="contact-grid">
+      <div class="contact-panel">
+        <h3>Get in Touch</h3>
+        <div class="contact-item">
+          <span class="ic">✉</span>
+          <div>
+            <div class="contact-label">Email</div>
+            <div class="contact-value" id="contactEmailDisplay">—</div>
+          </div>
+        </div>
+        <div class="contact-item">
+          <span class="ic">📞</span>
+          <div>
+            <div class="contact-label">Phone</div>
+            <div class="contact-value" id="contactPhoneDisplay">—</div>
+          </div>
+        </div>
+        <div class="contact-item">
+          <span class="ic">📍</span>
+          <div>
+            <div class="contact-label">Location</div>
+            <div class="contact-value" id="contactLocationDisplay">—</div>
+          </div>
+        </div>
+        <div class="contact-item">
+          <span class="ic">🕐</span>
+          <div>
+            <div class="contact-label">Hours</div>
+            <div class="contact-value" id="contactHoursDisplay">—</div>
+          </div>
+        </div>
+        <div class="contact-follow">
+          <div class="contact-label">Follow Us</div>
+          <div class="contact-social-row">
+            <a href="#" id="contactFbLink" target="_blank" rel="noopener" class="social-icon-btn" title="Facebook">📘</a>
+            <a href="#" id="contactYtLink" target="_blank" rel="noopener" class="social-icon-btn" title="YouTube">▶️</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="contact-panel">
+        <h3>Send a Message</h3>
+        <div class="form-field"><input type="text" id="contactFormName" placeholder="Your name"></div>
+        <div class="form-field"><input type="text" id="contactFormEmail" placeholder="Your email"></div>
+        <div class="form-field"><textarea id="contactFormMessage" rows="5" placeholder="How can we help you?"></textarea></div>
+        <button type="button" class="complete-booking-btn" id="contactSendBtn"><span class="ic">✉</span> Send Message</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ================= FOOTER ================= -->
+<footer class="site-footer">
+  <div class="wrap footer-row">
+    <div>© 2026 Mountain of the Lord Prayer Center, Katoloni. All rights reserved. | <a href="#">Privacy Policy</a> | <a href="#">Terms &amp; Conditions</a></div>
+    <div class="footer-credit"><span class="tag">&lt;/&gt;</span> Crafted by Tevin Mulinge | 0797510552</div>
+  </div>
+</footer>
+
+<!-- ================= PASSCODE GATE (Menu → Admin) ================= -->
+<div class="passcode-overlay" id="passcodeOverlay">
+  <div class="passcode-box">
+    <h3><span class="ic">🔑</span> Admin Access</h3>
+    <p>Enter the admin passcode to continue.</p>
+    <input type="password" id="passcodeInput" placeholder="Enter passcode" autocomplete="off">
+    <div class="passcode-error" id="passcodeError"></div>
+    <div class="passcode-actions">
+      <button type="button" class="icon-btn" id="passcodeCancel">Cancel</button>
+      <button type="button" class="icon-btn gold" id="passcodeSubmit"><span class="ic">🔓</span> Unlock</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MESSAGE REVIEW MODAL ================= -->
+<div class="passcode-overlay" id="messageReviewOverlay">
+  <div class="passcode-box wide">
+    <h3><span class="ic">👁</span> Review Message</h3>
+    <div class="review-field"><strong>Name:</strong> <span id="reviewName"></span></div>
+    <div class="review-field"><strong>Email:</strong> <span id="reviewEmail"></span></div>
+    <div class="review-field"><strong>Date:</strong> <span id="reviewDate"></span></div>
+    <div class="review-message" id="reviewBody"></div>
+    <div class="passcode-actions">
+      <button type="button" class="icon-btn" id="reviewCancelBtn">Close</button>
+      <button type="button" class="icon-btn gold" id="reviewSaveBtn"><span class="ic">💾</span> Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= DELETE REASON MODAL ================= -->
+<div class="passcode-overlay" id="deleteReasonOverlay">
+  <div class="passcode-box wide">
+    <h3><span class="ic">🗑</span> Delete Message</h3>
+    <p>Please give a reason for deleting this message.</p>
+    <textarea id="deleteReasonText" rows="3" placeholder="Reason..."></textarea>
+    <div class="passcode-actions">
+      <button type="button" class="icon-btn" id="deleteReasonCancelBtn">Cancel</button>
+      <button type="button" class="icon-btn gold" id="deleteReasonConfirmBtn"><span class="ic">🗑</span> Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= ADMIN PORTAL ================= -->
+<div class="admin-overlay" id="adminOverlay">
+  <div class="admin-portal">
+    <header class="admin-header">
+      <div class="admin-title"><span class="ic">🔑</span> Owner / Admin Portal</div>
+      <div class="admin-header-right">
+        <span class="admin-signedin">Signed in as <strong id="adminSignedInName">Admin</strong></span>
+        <button type="button" class="icon-btn" id="adminLogoutBtn"><span class="ic">⎋</span> Log out</button>
+      </div>
+    </header>
+    <div class="admin-body">
+      <aside class="admin-sidebar" id="adminSidebar"></aside>
+      <div class="admin-content" id="adminContent"></div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
 </body>
 </html>
