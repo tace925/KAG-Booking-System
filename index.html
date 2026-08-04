@@ -48,7 +48,7 @@
         </div>
       </div>
       <button class="icon-btn bell-btn" id="headerBellBtn"><span class="ic">🔔</span><span class="badge-count" id="headerBellCount" style="display:none;">0</span></button>
-      <button class="icon-btn" id="settingsBtn"><span class="ic">⚙</span> Settings / Help</button>
+      <button class="icon-btn" id="terminalBtn" title="System Terminal"><span class="ic">&gt;_</span> Terminal</button>
       <button class="theme-toggle" id="themeToggle" title="Toggle dark / light mode">🌙</button>
     </div>
   </div>
@@ -69,7 +69,6 @@
 
 <main class="wrap">
 
-  <!-- ================= HOME ================= -->
   <section class="page-section active" id="sec-home">
     <div class="hero">
       <div class="hero-glow"></div>
@@ -86,7 +85,6 @@
 
     <div class="divider"><span class="d-line"></span><span class="d-diamond"></span><span class="d-line"></span></div>
     <div class="section-eyebrow" style="text-align:center;">Our Leadership</div>
-
     <div class="pyramid" id="leadershipPyramid"></div>
 
     <div class="loop-band">
@@ -101,28 +99,24 @@
     </div>
   </section>
 
-  <!-- ================= TOUR ================= -->
   <section class="page-section" id="sec-tour">
     <div class="section-eyebrow">Around the church</div>
     <h2 class="section-title">Tour the Church</h2>
     <div id="tourContent"></div>
   </section>
 
-  <!-- ================= PROJECT ================= -->
   <section class="page-section" id="sec-project">
     <div class="section-eyebrow">Building the house</div>
     <h2 class="section-title">The Project</h2>
     <div id="projectContent"></div>
   </section>
 
-  <!-- ================= NOTICE BOARD ================= -->
   <section class="page-section" id="sec-notices">
     <div class="section-eyebrow">2026</div>
     <h2 class="section-title">Global Notice Board</h2>
     <div id="noticeboardContent"></div>
   </section>
 
-  <!-- ================= WALL ================= -->
   <section class="page-section" id="sec-wall">
     <div class="section-eyebrow">Discipleship</div>
     <h2 class="section-title">Katoloni Wall</h2>
@@ -130,72 +124,36 @@
     <div id="wallContent"></div>
   </section>
 
-  <!-- ================= BOOKING ================= -->
   <section class="page-section" id="sec-booking">
     <div class="section-eyebrow">Guest House</div>
     <h2 class="section-title">Booking</h2>
     <p class="section-lede">Comfortable accommodation for visitors and guests of Mountain of the Lord.</p>
-
     <div class="booking-block">
       <h3 class="admin-panel-title"><span class="ic">🛏</span> Our Rooms &amp; Rates</h3>
       <div id="roomsGrid"><p class="muted">Loading rooms...</p></div>
     </div>
-
     <div class="booking-form-panel">
       <h3 class="admin-panel-title"><span class="ic">📅</span> Book Your Stay</h3>
-
       <div class="form-field">
         <label>🏨 Select Room Type *</label>
         <select id="bookRoomSelect"><option value="">-- Select Room --</option></select>
       </div>
       <div class="form-row">
-        <div class="form-field">
-          <label>📅 Check-in Date *</label>
-          <input type="date" id="bookCheckin">
-        </div>
-        <div class="form-field">
-          <label>📅 Check-out Date *</label>
-          <input type="date" id="bookCheckout">
-        </div>
+        <div class="form-field"><label>📅 Check-in Date *</label><input type="date" id="bookCheckin"></div>
+        <div class="form-field"><label>📅 Check-out Date *</label><input type="date" id="bookCheckout"></div>
       </div>
-      <div class="form-field">
-        <label>👥 Number of Guests *</label>
-        <input type="number" id="bookGuests" value="1" min="1">
-      </div>
-      <div class="form-field">
-        <label>👤 Full Name *</label>
-        <input type="text" id="bookFullName" placeholder="Enter your full name">
-      </div>
+      <div class="form-field"><label>👥 Number of Guests *</label><input type="number" id="bookGuests" value="1" min="1"></div>
+      <div class="form-field"><label>👤 Full Name *</label><input type="text" id="bookFullName" placeholder="Enter your full name"></div>
       <div class="form-row">
-        <div class="form-field">
-          <label>📞 Phone Number *</label>
-          <input type="text" id="bookPhone" placeholder="07XX XXX XXX">
-        </div>
-        <div class="form-field">
-          <label>✉ Email (Optional)</label>
-          <input type="text" id="bookEmail" placeholder="your@email.com">
-        </div>
+        <div class="form-field"><label>📞 Phone Number *</label><input type="text" id="bookPhone" placeholder="07XX XXX XXX"></div>
+        <div class="form-field"><label>✉ Email (Optional)</label><input type="text" id="bookEmail" placeholder="your@email.com"></div>
       </div>
-      <div class="form-field">
-        <label>👕 Request Items</label>
-        <div id="requestItemsList" class="request-items-list"></div>
-      </div>
-
+      <div class="form-field"><label>👕 Request Items</label><div id="requestItemsList" class="request-items-list"></div></div>
       <div class="mpesa-panel">
         <h4><span class="ic">📞</span> M-Pesa Payment</h4>
         <div class="mpesa-numbers">
-          <div class="mpesa-card">
-            <div class="ic">📱</div>
-            <div class="mpesa-label">M-Pesa Number 1</div>
-            <div class="mpesa-number" id="mpesaPrimary">—</div>
-            <div class="muted small">Send payment via M-Pesa</div>
-          </div>
-          <div class="mpesa-card">
-            <div class="ic">📱</div>
-            <div class="mpesa-label">M-Pesa Number 2</div>
-            <div class="mpesa-number" id="mpesaAlt">—</div>
-            <div class="muted small">Alternative number</div>
-          </div>
+          <div class="mpesa-card"><div class="ic">📱</div><div class="mpesa-label">M-Pesa Number 1</div><div class="mpesa-number" id="mpesaPrimary">—</div><div class="muted small">Send payment via M-Pesa</div></div>
+          <div class="mpesa-card"><div class="ic">📱</div><div class="mpesa-label">M-Pesa Number 2</div><div class="mpesa-number" id="mpesaAlt">—</div><div class="muted small">Alternative number</div></div>
         </div>
         <div class="form-field">
           <label>🧾 M-Pesa Transaction ID *</label>
@@ -203,7 +161,6 @@
           <div class="muted small">Enter the confirmation code from M-Pesa message</div>
         </div>
       </div>
-
       <div class="bishop-contact-band">
         <div class="ic">⛪</div>
         <div>
@@ -212,19 +169,16 @@
           <div class="muted small" id="bishopNote"></div>
         </div>
       </div>
-
       <div class="booking-summary">
         <h4>Booking Summary</h4>
         <div class="summary-row"><span>Room rate:</span> <span id="summaryRate">KES 0</span> <span class="muted small">per day</span></div>
         <div class="summary-row"><span>Number of nights:</span> <span id="summaryNights">0</span></div>
-        <div class="summary-row"><span>Free blanket:</span> <span id="summaryBlanket">1 included</span> <span class="info-dot" title="1 blanket is provided free. Extra blankets cost 10 KES/night each">ⓘ</span></div>
+        <div class="summary-row"><span>Free blanket:</span> <span id="summaryBlanket">1 included</span></div>
         <hr>
         <div class="summary-total">Total Amount: <span id="summaryTotal">KES 0</span></div>
       </div>
-
       <button type="button" class="complete-booking-btn" id="completeBookingBtn"><span class="ic">✔</span> Complete Booking</button>
     </div>
-
     <div class="check-booking-panel">
       <h3 class="admin-panel-title"><span class="ic">🔍</span> Check My Booking</h3>
       <div class="check-booking-row">
@@ -233,53 +187,25 @@
       </div>
       <div id="checkBookingResults"></div>
     </div>
-
     <div class="canteen-banner">🍽 Canteen Available on-site 🍽</div>
   </section>
 
-  <!-- ================= LIBRARY ================= -->
   <section class="page-section" id="sec-library">
     <div class="section-eyebrow">Resources</div>
     <h2 class="section-title">Library</h2>
     <div id="libraryContent"></div>
   </section>
 
-  <!-- ================= CONTACT ================= -->
   <section class="page-section" id="sec-contact">
     <div class="section-eyebrow">Reach us</div>
     <h2 class="section-title">Contact Us</h2>
-
     <div class="contact-grid">
       <div class="contact-panel">
         <h3>Get in Touch</h3>
-        <div class="contact-item">
-          <span class="ic">✉</span>
-          <div>
-            <div class="contact-label">Email</div>
-            <div class="contact-value" id="contactEmailDisplay">—</div>
-          </div>
-        </div>
-        <div class="contact-item">
-          <span class="ic">📞</span>
-          <div>
-            <div class="contact-label">Phone</div>
-            <div class="contact-value" id="contactPhoneDisplay">—</div>
-          </div>
-        </div>
-        <div class="contact-item">
-          <span class="ic">📍</span>
-          <div>
-            <div class="contact-label">Location</div>
-            <div class="contact-value" id="contactLocationDisplay">—</div>
-          </div>
-        </div>
-        <div class="contact-item">
-          <span class="ic">🕐</span>
-          <div>
-            <div class="contact-label">Hours</div>
-            <div class="contact-value" id="contactHoursDisplay">—</div>
-          </div>
-        </div>
+        <div class="contact-item"><span class="ic">✉</span><div><div class="contact-label">Email</div><div class="contact-value" id="contactEmailDisplay">—</div></div></div>
+        <div class="contact-item"><span class="ic">📞</span><div><div class="contact-label">Phone</div><div class="contact-value" id="contactPhoneDisplay">—</div></div></div>
+        <div class="contact-item"><span class="ic">📍</span><div><div class="contact-label">Location</div><div class="contact-value" id="contactLocationDisplay">—</div></div></div>
+        <div class="contact-item"><span class="ic">🕐</span><div><div class="contact-label">Hours</div><div class="contact-value" id="contactHoursDisplay">—</div></div></div>
         <div class="contact-follow">
           <div class="contact-label">Follow Us</div>
           <div class="contact-social-row">
@@ -288,7 +214,6 @@
           </div>
         </div>
       </div>
-
       <div class="contact-panel">
         <h3>Send a Message</h3>
         <div class="form-field"><input type="text" id="contactFormName" placeholder="Your name"></div>
@@ -301,7 +226,6 @@
 
 </main>
 
-<!-- ================= FOOTER ================= -->
 <footer class="site-footer">
   <div class="wrap footer-row">
     <div>© 2026 Mountain of the Lord Prayer Center, Katoloni. All rights reserved. | <a href="#">Privacy Policy</a> | <a href="#">Terms &amp; Conditions</a></div>
@@ -309,7 +233,6 @@
   </div>
 </footer>
 
-<!-- ================= PASSCODE GATE ================= -->
 <div class="passcode-overlay" id="passcodeOverlay">
   <div class="passcode-box">
     <h3><span class="ic">🔑</span> Admin Access</h3>
@@ -323,7 +246,6 @@
   </div>
 </div>
 
-<!-- ================= MESSAGE REVIEW MODAL ================= -->
 <div class="passcode-overlay" id="messageReviewOverlay">
   <div class="passcode-box wide">
     <h3><span class="ic">👁</span> Review Message</h3>
@@ -338,20 +260,18 @@
   </div>
 </div>
 
-<!-- ================= DELETE REASON MODAL ================= -->
 <div class="passcode-overlay" id="deleteReasonOverlay">
   <div class="passcode-box wide">
-    <h3><span class="ic">🗑</span> Delete Message</h3>
-    <p>Please give a reason for deleting this message.</p>
+    <h3 id="deleteReasonTitle"><span class="ic">🗑</span> Delete Message</h3>
+    <p id="deleteReasonPromptText">Please give a reason for deleting this message.</p>
     <textarea id="deleteReasonText" rows="3" placeholder="Reason..."></textarea>
     <div class="passcode-actions">
       <button type="button" class="icon-btn" id="deleteReasonCancelBtn">Cancel</button>
-      <button type="button" class="icon-btn gold" id="deleteReasonConfirmBtn"><span class="ic">🗑</span> Delete</button>
+      <button type="button" class="icon-btn gold" id="deleteReasonConfirmBtn"><span class="ic" id="deleteReasonConfirmIcon">🗑</span> <span id="deleteReasonConfirmLabel">Delete</span></button>
     </div>
   </div>
 </div>
 
-<!-- ================= ADMIN PORTAL ================= -->
 <div class="admin-overlay" id="adminOverlay">
   <div class="admin-portal">
     <header class="admin-header">
@@ -368,6 +288,10 @@
   </div>
 </div>
 
+<!-- Firebase (Compat SDK — works with non-module app.js) -->
+<script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore-compat.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
