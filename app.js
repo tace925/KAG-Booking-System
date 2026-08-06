@@ -69,6 +69,23 @@ function scheduleCloudSave(db) {
   }, 600);
 }
 
+/** Sign in anonymously and wait until Firebase confirms the session. */
+function ensureAuthReady() {
+  return new Promise((resolve) => {
+    if (!_auth) { resolve(null); return; }
+    const unsub = _auth.onAuthStateChanged(user => {
+      if (user) {
+        unsub();
+        resolve(user);
+      }
+    });
+    _auth.signInAnonymously().catch(err => {
+      console.error('Anonymous sign-in failed:', err);
+      resolve(null); // fall through — writes will fail, but app still loads
+    });
+  });
+}
+
 async function pushDBToCloud(db) {
   if (!_firestore) return;
   // Firestore doc limit ~1MB — strip nothing yet; warn if large
@@ -99,6 +116,7 @@ async function pullDBFromCloud() {
  */
 async function bootApp() {
   initFirebase();
+  await ensureAuthReady();   // ← ADD THIS LINE
   let db = null;
 
   if (_cloudEnabled && _firestore) {
@@ -1409,6 +1427,11 @@ function libraryAlertCount(db) {
   return pendingReq + overdue;
 }
 
+/* NEW: pending guest-house bookings awaiting admin action */
+function bookingAlertCount(db) {
+  return ((db.booking && db.booking.bookings) || []).filter(b => b.status === 'pending').length;
+}
+
 /* NEW: complaint alert counts */
 function adminComplaintsAlertCount(db) {
   return (db.complaints || []).filter(c => c.status === 'open' && c.toRole === 'super_admin').length;
@@ -1422,7 +1445,7 @@ function combinedUnreadCount(db) {
   const unreadInternal = (db.messages || []).filter(m => m.toRole === 'super_admin' && !m.readAt).length;
   const openComplaints = adminComplaintsAlertCount(db);
   const memberDocs = (db.memberDocuments || []).filter(d => d.toRole === 'super_admin' && d.status === 'new').length;
-  return newContact + unreadInternal + libraryAlertCount(db) + openComplaints + memberDocs;
+  return newContact + unreadInternal + libraryAlertCount(db) + openComplaints + memberDocs + bookingAlertCount(db);
 }
 
 function updateHeaderBellBadge(db) {
@@ -1445,6 +1468,7 @@ function renderAdminSidebar() {
   const db = loadDB();
   const unread = combinedUnreadCount(db);
   const libAlerts = libraryAlertCount(db);
+  const bookingAlerts = bookingAlertCount(db);
   const receivedOnly = (db.contactSubmissions || []).filter(c => c.status === 'new').length
     + (db.messages || []).filter(m => m.toRole === 'super_admin' && !m.readAt).length;
   const complaintsOpen = adminComplaintsAlertCount(db);
@@ -1454,6 +1478,7 @@ function renderAdminSidebar() {
     let badge = '';
     if (t.key === 'received' && receivedOnly > 0) badge = `<span class="badge-count">${receivedOnly}</span>`;
     if (t.key === 'library' && libAlerts > 0) badge = `<span class="badge-count">${libAlerts}</span>`;
+    if (t.key === 'booking' && bookingAlerts > 0) badge = `<span class="badge-count">${bookingAlerts}</span>`;
     if (t.key === 'complaints' && complaintsOpen > 0) badge = `<span class="badge-count">${complaintsOpen}</span>`;
     if (t.key === 'memberControl' && memberDocsNew > 0) badge = `<span class="badge-count">${memberDocsNew}</span>`;
     return `
@@ -4549,6 +4574,8 @@ function advanceBookingStatus(id, to) {
   saveDB(db);
   logAudit('super_admin', db.owner.name, `Booking marked ${to}`, b.fullName);
   renderAdminBookingsList();
+  renderAdminSidebar();
+  updateHeaderBellBadge(db);
 }
 
 function deleteBooking(id) {
@@ -4556,6 +4583,8 @@ function deleteBooking(id) {
   db.booking.bookings = db.booking.bookings.filter(b => b.id !== id);
   saveDB(db);
   renderAdminBookingsList();
+  renderAdminSidebar();
+  updateHeaderBellBadge(db);
 }
 
 /* ---- Room Rates sub-tab ---- */
@@ -5394,6 +5423,9 @@ function updateBookingSummary() {
 
 function handleCompleteBooking() {
   const db = loadDB();
+  if (!db.booking) db.booking = { rooms: [], itemCatalog: [], bookings: [], itemCharges: [], mpesaNumbers: {}, bishopContact: {} };
+  if (!db.booking.bookings) db.booking.bookings = [];
+
   const roomId = document.getElementById('bookRoomSelect').value;
   const room = db.booking.rooms.find(r => r.id === roomId);
   const checkin = document.getElementById('bookCheckin').value;
@@ -5445,9 +5477,15 @@ function handleCompleteBooking() {
   };
 
   const dbNow = loadDB();
+  if (!dbNow.booking) dbNow.booking = db.booking;
+  if (!dbNow.booking.bookings) dbNow.booking.bookings = [];
   dbNow.booking.bookings.unshift(booking);
   saveDB(dbNow);
   logAudit('guest', fullName, 'Made a booking', room.name);
+
+  /* ---- Notify admin: bell badge + sidebar badge (mirrors library/contact flow) ---- */
+  updateHeaderBellBadge(dbNow);
+  if (document.getElementById('adminSidebar')) renderAdminSidebar();
 
   alert(`Booking submitted! Your booking ID is ${booking.id.slice(-6)}. We'll confirm shortly once your M-Pesa payment is verified.`);
 
@@ -5458,14 +5496,23 @@ function handleCompleteBooking() {
   document.getElementById('bookGuests').value = 1;
   document.querySelectorAll('.requestItemChk').forEach(chk => { chk.checked = false; });
   updateBookingSummary();
+
+  /* ---- Immediately show the guest their own booking in "Check My Booking" ---- */
+  const checkNameInput = document.getElementById('checkBookingName');
+  if (checkNameInput) {
+    checkNameInput.value = fullName;
+    handleCheckBooking();
+    document.getElementById('checkBookingResults')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 }
 
 function handleCheckBooking() {
   const db = loadDB();
-  const name = document.getElementById('checkBookingName').value.trim().toLowerCase();
+  const bookings = (db.booking && db.booking.bookings) || [];
+  const name = (document.getElementById('checkBookingName').value || '').trim().toLowerCase();
   const el = document.getElementById('checkBookingResults');
   if (!name) { el.innerHTML = '<p class="muted">Enter your full name to search.</p>'; return; }
-  const matches = db.booking.bookings.filter(b => b.fullName.toLowerCase().includes(name));
+  const matches = bookings.filter(b => (b.fullName || '').toLowerCase().includes(name));
   el.innerHTML = matches.length ? matches.map(b => `
     <div class="cms-list-item">
       <div>

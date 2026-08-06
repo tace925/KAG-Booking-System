@@ -10,86 +10,93 @@
 
 <!-- ================= HEADER ================= -->
 <header class="site-header">
-  <div class="header-row">
-    <div class="brand">
-      <svg class="brand-mark" viewBox="0 0 100 122" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id="shieldGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#f4cd7c"/>
-            <stop offset="100%" stop-color="#3a2b0c"/>
-          </linearGradient>
-          <linearGradient id="bannerGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#2a2110"/>
-            <stop offset="100%" stop-color="#161006"/>
-          </linearGradient>
-        </defs>
-        <rect x="6" y="2" width="88" height="20" rx="3" fill="url(#bannerGrad)" stroke="#e8b34c" stroke-width="1.6"/>
-        <text x="50" y="16" text-anchor="middle" font-family="Karla, sans-serif" font-weight="800" font-size="10" letter-spacing="1" fill="#e8b34c">KAG</text>
-        <path d="M50 26 L92 36 V70 C92 96 74 112 50 120 C26 112 8 96 8 70 V36 Z" fill="url(#shieldGrad)" stroke="#e8b34c" stroke-width="2.5"/>
-        <path d="M32 52 L50 45 L68 52 V60 L50 53 L32 60 Z" fill="#2a2110" opacity=".85"/>
-        <text x="50" y="96" text-anchor="middle" font-family="Cormorant Garamond, serif" font-weight="700" font-size="34" fill="#2a2110">AG</text>
-      </svg>
-      <div class="brand-text">
-        <div class="name-top">Mountain of the Lord</div>
-        <div class="name-sub">Prayer Center · Katoloni</div>
-      </div>
-    </div>
 
-    <div class="header-actions">
-      <div class="menu-dropdown-wrap" id="menuDropdownWrap">
-        <button class="icon-btn" id="menuBtn"><span class="ic">☰</span> Menu</button>
-        <div class="menu-dropdown" id="menuDropdown">
-          <button type="button" class="menu-dropdown-item" data-portal="admin"><span class="ic">🔑</span> Admin Portal</button>
-          <button type="button" class="menu-dropdown-item" data-portal="bishop"><span class="ic">✝</span> Bishop</button>
-          <button type="button" class="menu-dropdown-item" data-portal="protocol"><span class="ic">🛎</span> Protocol</button>
-          <button type="button" class="menu-dropdown-item" data-portal="disciple1"><span class="ic">📖</span> Disciple Class 1</button>
-          <button type="button" class="menu-dropdown-item" data-portal="disciple2"><span class="ic">📖</span> Disciple Class 2</button>
-          <button type="button" class="menu-dropdown-item" data-portal="disciple3"><span class="ic">📖</span> Disciple Class 3</button>
+  <div class="topbar">
+    <div class="wrap topbar-row">
+      <span class="topbar-tag">Welcome to the Mountain</span>
+      <div class="topbar-actions">
+        <div class="menu-dropdown-wrap" id="menuDropdownWrap">
+          <button class="topbar-link" id="menuBtn"><span class="ic">☰</span> Portals</button>
+          <div class="menu-dropdown" id="menuDropdown">
+            <button type="button" class="menu-dropdown-item" data-portal="admin"><span class="ic">🔑</span> Admin Portal</button>
+            <button type="button" class="menu-dropdown-item" data-portal="bishop"><span class="ic">✝</span> Bishop</button>
+            <button type="button" class="menu-dropdown-item" data-portal="protocol"><span class="ic">🛎</span> Protocol</button>
+            <button type="button" class="menu-dropdown-item" data-portal="disciple1"><span class="ic">📖</span> Disciple Class 1</button>
+            <button type="button" class="menu-dropdown-item" data-portal="disciple2"><span class="ic">📖</span> Disciple Class 2</button>
+            <button type="button" class="menu-dropdown-item" data-portal="disciple3"><span class="ic">📖</span> Disciple Class 3</button>
+          </div>
         </div>
+        <button class="topbar-link bell-btn" id="headerBellBtn"><span class="ic">🔔</span><span class="badge-count" id="headerBellCount" style="display:none;">0</span></button>
+        <button class="topbar-link" id="terminalBtn" title="System Terminal"><span class="ic">&gt;_</span> Terminal</button>
+        <button class="theme-toggle" id="themeToggle" title="Toggle dark / light mode">🌙</button>
       </div>
-      <button class="icon-btn bell-btn" id="headerBellBtn"><span class="ic">🔔</span><span class="badge-count" id="headerBellCount" style="display:none;">0</span></button>
-      <button class="icon-btn" id="terminalBtn" title="System Terminal"><span class="ic">&gt;_</span> Terminal</button>
-      <button class="theme-toggle" id="themeToggle" title="Toggle dark / light mode">🌙</button>
     </div>
   </div>
 
+  <div class="header-row wrap">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <rect x="2" y="2" width="96" height="96" fill="none"/>
+        <path d="M50 4 L96 50 L50 96 L4 50 Z" fill="none" stroke="#e8b34c" stroke-width="1.6"/>
+        <text x="50" y="58" text-anchor="middle" font-family="Cormorant Garamond, serif" font-weight="700" font-size="30" fill="#e8b34c">MG</text>
+      </svg>
+      <div class="brand-text">
+        <div class="name-top">Mountain of the Lord</div>
+        <div class="name-sub">Prayer Center, Katoloni</div>
+      </div>
+    </div>
+
+    <button class="icon-btn gold hero-cta-header nav-btn" data-section="booking"><span class="ic">🛏</span> Plan a Visit <span class="arrow">→</span></button>
+  </div>
+
   <nav class="main-nav">
-    <div class="nav-row" id="navRow">
-      <button class="nav-btn active" data-section="home"><span class="ic">🏠</span> Home</button>
-      <button class="nav-btn" data-section="tour"><span class="ic">🗺</span> Tour</button>
-      <button class="nav-btn" data-section="project"><span class="ic">🏗</span> Project</button>
-      <button class="nav-btn" data-section="notices"><span class="ic">📢</span> Notice Board</button>
-      <button class="nav-btn" data-section="wall"><span class="ic">👥</span> Katoloni Wall</button>
-      <button class="nav-btn" data-section="booking"><span class="ic">🛏</span> Booking</button>
-      <button class="nav-btn" data-section="library"><span class="ic">📚</span> Library</button>
-      <button class="nav-btn" data-section="contact"><span class="ic">✉</span> Contact</button>
+    <div class="wrap nav-row" id="navRow">
+      <button class="nav-btn active" data-section="home">Home</button>
+      <button class="nav-btn" data-section="tour">Tour</button>
+      <button class="nav-btn" data-section="project">Project</button>
+      <button class="nav-btn" data-section="notices">Notice Board</button>
+      <button class="nav-btn" data-section="wall">Katoloni Wall</button>
+      <button class="nav-btn" data-section="booking">Booking</button>
+      <button class="nav-btn" data-section="library">Library</button>
+      <button class="nav-btn" data-section="contact">Contact</button>
     </div>
   </nav>
 </header>
 
-<main class="wrap">
+<main>
 
-  <section class="page-section active" id="sec-home">
-    <div class="hero">
+  <section class="page-section active band-dark" id="sec-home">
+    <div class="hero hero-full">
       <div class="hero-glow"></div>
-      <svg class="hero-crest" viewBox="0 0 100 122" xmlns="http://www.w3.org/2000/svg">
-        <rect x="6" y="2" width="88" height="20" rx="3" fill="#161006" stroke="#e8b34c" stroke-width="1.4"/>
-        <text x="50" y="16" text-anchor="middle" font-family="Karla, sans-serif" font-weight="800" font-size="10" letter-spacing="1" fill="#e8b34c">KAG</text>
-        <path d="M50 26 L92 36 V70 C92 96 74 112 50 120 C26 112 8 96 8 70 V36 Z" fill="none" stroke="#e8b34c" stroke-width="2"/>
-        <path d="M32 52 L50 45 L68 52 V60 L50 53 L32 60 Z" fill="#e8b34c"/>
-        <text x="50" y="96" text-anchor="middle" font-family="Cormorant Garamond, serif" font-weight="700" font-size="30" fill="#e8b34c">AG</text>
-      </svg>
-      <div class="typing-line"><span id="typingText"></span><span class="cursor">&nbsp;</span></div>
-      <div class="hero-sub">A house of prayer for Katoloni and all who seek it</div>
+      <div class="hero-inner">
+        <div class="divider divider-left"><span class="d-line"></span><span class="d-diamond"></span></div>
+        <div class="section-eyebrow">A house of prayer for all people</div>
+        <h1 class="hero-title">
+          <span id="typingText"></span><span class="cursor">&nbsp;</span>
+        </h1>
+        <div class="hero-sub">Welcome to Mountain of the Lord Prayer Center, Katoloni. A place to encounter God, grow in faith and find a family in Christ.</div>
+        <div class="hero-cta-row">
+          <button class="btn-solid nav-btn" data-section="booking">Plan Your Visit <span class="arrow">→</span></button>
+          <button class="btn-outline nav-btn" data-section="tour">Explore the Church <span class="arrow">▾</span></button>
+        </div>
+      </div>
     </div>
 
-    <div class="divider"><span class="d-line"></span><span class="d-diamond"></span><span class="d-line"></span></div>
-    <div class="section-eyebrow" style="text-align:center;">Our Leadership</div>
-    <div class="pyramid" id="leadershipPyramid"></div>
+    <div class="band band-servants">
+      <div class="section-eyebrow-row">
+        <div class="divider divider-left"><span class="d-line"></span><span class="d-diamond"></span></div>
+        <span class="section-eyebrow">Our Leadership</span>
+      </div>
+      <div class="leader-head-row">
+        <h2 class="section-title">Servants of the house.</h2>
+        <p class="leader-head-note">Guided by prayer, grounded in Scripture and committed to serving every person with humility, wisdom and love.</p>
+      </div>
+      <div class="pyramid" id="leadershipPyramid"></div>
+    </div>
 
     <div class="loop-band">
       <div class="loop-text">
-        <h3>📬 Stay in the Loop</h3>
+        <h3>Stay in the Loop</h3>
         <p>Get the latest news, service times and announcements from Mountain of the Lord delivered straight to you.</p>
       </div>
       <div class="loop-socials">
@@ -99,34 +106,36 @@
     </div>
   </section>
 
-  <section class="page-section" id="sec-tour">
-    <div class="section-eyebrow">Around the church</div>
-    <h2 class="section-title">Tour the Church</h2>
+  <section class="page-section band-cream wrap" id="sec-tour">
+    <div class="section-eyebrow-row"><div class="divider divider-left"><span class="d-line"></span><span class="d-diamond"></span></div><span class="section-eyebrow">Church Tour</span></div>
+    <h2 class="section-title">There is a place for you here.</h2>
+    <p class="section-lede">Whether this is your first visit or you are looking for a spiritual home, you will be welcomed with warmth. Come as you are and join us in seeking the Lord together.</p>
     <div id="tourContent"></div>
   </section>
 
-  <section class="page-section" id="sec-project">
-    <div class="section-eyebrow">Building the house</div>
-    <h2 class="section-title">The Project</h2>
+  <section class="page-section band-dark wrap" id="sec-project">
+    <div class="section-eyebrow-row"><div class="divider divider-left"><span class="d-line"></span><span class="d-diamond"></span></div><span class="section-eyebrow">The Sanctuary Project</span></div>
+    <h2 class="section-title">Building a home for generations.</h2>
+    <p class="section-lede">We are preparing a lasting place of worship, prayer and service for Katoloni. Every prayer, gift and willing hand helps build the vision.</p>
     <div id="projectContent"></div>
   </section>
 
-  <section class="page-section" id="sec-notices">
-    <div class="section-eyebrow">2026</div>
-    <h2 class="section-title">Global Notice Board</h2>
+  <section class="page-section band-cream wrap" id="sec-notices">
+    <div class="section-eyebrow-row"><div class="divider divider-left"><span class="d-line"></span><span class="d-diamond"></span></div><span class="section-eyebrow">Notice Board</span></div>
+    <h2 class="section-title">Life on the mountain.</h2>
     <div id="noticeboardContent"></div>
   </section>
 
-  <section class="page-section" id="sec-wall">
-    <div class="section-eyebrow">Discipleship</div>
-    <h2 class="section-title">Katoloni Wall</h2>
-    <p class="section-lede">Graduates of the discipleship classes.</p>
+  <section class="page-section band-dark wrap" id="sec-wall">
+    <div class="section-eyebrow-row"><div class="divider divider-left"><span class="d-line"></span><span class="d-diamond"></span></div><span class="section-eyebrow">The Katoloni Wall</span></div>
+    <h2 class="section-title">Stories of grace, written together.</h2>
+    <p class="section-lede">A living record of prayers answered, lives restored and faith strengthened in our community.</p>
     <div id="wallContent"></div>
   </section>
 
-  <section class="page-section" id="sec-booking">
-    <div class="section-eyebrow">Guest House</div>
-    <h2 class="section-title">Booking</h2>
+  <section class="page-section band-cream wrap" id="sec-booking">
+    <div class="section-eyebrow-row"><div class="divider divider-left"><span class="d-line"></span><span class="d-diamond"></span></div><span class="section-eyebrow">Booking</span></div>
+    <h2 class="section-title">Plan your visit.</h2>
     <p class="section-lede">Comfortable accommodation for visitors and guests of Mountain of the Lord.</p>
     <div class="booking-block">
       <h3 class="admin-panel-title"><span class="ic">🛏</span> Our Rooms &amp; Rates</h3>
@@ -190,15 +199,15 @@
     <div class="canteen-banner">🍽 Canteen Available on-site 🍽</div>
   </section>
 
-  <section class="page-section" id="sec-library">
-    <div class="section-eyebrow">Resources</div>
-    <h2 class="section-title">Library</h2>
+  <section class="page-section band-dark wrap" id="sec-library">
+    <div class="section-eyebrow-row"><div class="divider divider-left"><span class="d-line"></span><span class="d-diamond"></span></div><span class="section-eyebrow">Church Library</span></div>
+    <h2 class="section-title">Grow deeper in the Word.</h2>
     <div id="libraryContent"></div>
   </section>
 
-  <section class="page-section" id="sec-contact">
-    <div class="section-eyebrow">Reach us</div>
-    <h2 class="section-title">Contact Us</h2>
+  <section class="page-section band-cream wrap" id="sec-contact">
+    <div class="section-eyebrow-row"><div class="divider divider-left"><span class="d-line"></span><span class="d-diamond"></span></div><span class="section-eyebrow">Reach Us</span></div>
+    <h2 class="section-title">We'd love to hear from you.</h2>
     <div class="contact-grid">
       <div class="contact-panel">
         <h3>Get in Touch</h3>
@@ -227,6 +236,34 @@
 </main>
 
 <footer class="site-footer">
+  <div class="wrap footer-top">
+    <div class="footer-col footer-brand">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+          <path d="M50 4 L96 50 L50 96 L4 50 Z" fill="none" stroke="#e8b34c" stroke-width="1.6"/>
+          <text x="50" y="58" text-anchor="middle" font-family="Cormorant Garamond, serif" font-weight="700" font-size="30" fill="#e8b34c">MG</text>
+        </svg>
+        <div class="brand-text">
+          <div class="name-top">Mountain of the Lord</div>
+          <div class="name-sub">Prayer Center, Katoloni</div>
+        </div>
+      </div>
+      <p class="footer-blurb">A faith community devoted to prayer, the Word and serving Katoloni with the love of Jesus Christ.</p>
+    </div>
+    <div class="footer-col">
+      <div class="footer-heading">Explore</div>
+      <button class="footer-link nav-btn" data-section="tour">Tour</button>
+      <button class="footer-link nav-btn" data-section="project">Project</button>
+      <button class="footer-link nav-btn" data-section="notices">Notice Board</button>
+      <button class="footer-link nav-btn" data-section="wall">Katoloni Wall</button>
+      <button class="footer-link nav-btn" data-section="booking">Booking</button>
+    </div>
+    <div class="footer-col">
+      <div class="footer-heading">Contact</div>
+      <div class="footer-contact-line"><span class="ic">📍</span> Katoloni, Machakos County, Kenya</div>
+      <div class="footer-contact-line"><span class="ic">✉</span> hello@mountainofthelord.org</div>
+    </div>
+  </div>
   <div class="wrap footer-row">
     <div>© 2026 Mountain of the Lord Prayer Center, Katoloni. All rights reserved. | <a href="#">Privacy Policy</a> | <a href="#">Terms &amp; Conditions</a></div>
     <div class="footer-credit"><span class="tag">&lt;/&gt;</span> Crafted by <a href="https://tevin-tec.vercel.app/" target="_blank" rel="noopener">TEVINTECH</a> | 0797510552</div>
