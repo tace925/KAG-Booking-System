@@ -69,22 +69,6 @@ function scheduleCloudSave(db) {
   }, 600);
 }
 
-/** Sign in anonymously and wait until Firebase confirms the session. */
-function ensureAuthReady() {
-  return new Promise((resolve) => {
-    if (!_auth) { resolve(null); return; }
-    const unsub = _auth.onAuthStateChanged(user => {
-      if (user) {
-        unsub();
-        resolve(user);
-      }
-    });
-    _auth.signInAnonymously().catch(err => {
-      console.error('Anonymous sign-in failed:', err);
-      resolve(null); // fall through — writes will fail, but app still loads
-    });
-  });
-}
 
 async function pushDBToCloud(db) {
   if (!_firestore) return;
@@ -116,7 +100,6 @@ async function pullDBFromCloud() {
  */
 async function bootApp() {
   initFirebase();
-  await ensureAuthReady();   // ← ADD THIS LINE
   let db = null;
 
   if (_cloudEnabled && _firestore) {
@@ -1302,6 +1285,13 @@ function initAdminPortal() {
   document.getElementById('headerBellBtn')?.addEventListener('click', () => openPortalPasscodeGate('admin', 'received'));
   document.getElementById('passcodeCancel').addEventListener('click', closePasscodeGate);
   document.getElementById('passcodeSubmit').addEventListener('click', attemptPasscode);
+  document.getElementById('emailLoginBtn')?.addEventListener('click', attemptEmailLogin);
+  document.getElementById('loginPasswordInput')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') attemptEmailLogin();
+  });
+  document.getElementById('loginEmailInput')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('loginPasswordInput')?.focus();
+  });
   document.getElementById('passcodeInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') attemptPasscode();
   });
@@ -1333,10 +1323,29 @@ function openPortalPasscodeGate(portalKey, target = 'profile') {
   pendingAdminTarget = target;
   document.getElementById('passcodeError').textContent = '';
   document.getElementById('passcodeInput').value = '';
-  const titleEl = document.querySelector('#passcodeOverlay h3');
+  const emailIn = document.getElementById('loginEmailInput');
+  const passIn = document.getElementById('loginPasswordInput');
+  if (emailIn) emailIn.value = '';
+  if (passIn) passIn.value = '';
+
+  const titleEl = document.getElementById('passcodeTitle') || document.querySelector('#passcodeOverlay h3');
   if (titleEl) titleEl.innerHTML = `<span class="ic">🔑</span> ${PORTAL_DEFS[portalKey].label} Access`;
+
+  const emailBlock = document.getElementById('adminLoginEmailBlock');
+  const hint = document.getElementById('passcodeHint');
+  if (portalKey === 'admin') {
+    if (emailBlock) emailBlock.style.display = '';
+    if (hint) hint.textContent = 'Sign in with your Firebase email/password, or use the admin passcode.';
+  } else {
+    if (emailBlock) emailBlock.style.display = 'none';
+    if (hint) hint.textContent = 'Enter the portal passcode to continue.';
+  }
+
   document.getElementById('passcodeOverlay').classList.add('active');
-  setTimeout(() => document.getElementById('passcodeInput').focus(), 50);
+  setTimeout(() => {
+    if (portalKey === 'admin' && emailIn) emailIn.focus();
+    else document.getElementById('passcodeInput').focus();
+  }, 50);
 }
 
 function closePasscodeGate() {
@@ -1357,6 +1366,43 @@ function attemptPasscode() {
     }
   } else {
     document.getElementById('passcodeError').textContent = 'Incorrect passcode. Try again.';
+  }
+}
+
+async function attemptEmailLogin() {
+  if (pendingPortalKey !== 'admin') {
+    document.getElementById('passcodeError').textContent = 'Email login is only for Admin. Use passcode for other portals.';
+    return;
+  }
+  const email = (document.getElementById('loginEmailInput')?.value || '').trim();
+  const password = document.getElementById('loginPasswordInput')?.value || '';
+  const errEl = document.getElementById('passcodeError');
+  if (!email || !password) {
+    errEl.textContent = 'Enter email and password.';
+    return;
+  }
+  if (!_auth) {
+    errEl.textContent = 'Firebase Auth not ready. Check internet / SDK load.';
+    return;
+  }
+  errEl.textContent = 'Signing in…';
+  try {
+    const cred = await _auth.signInWithEmailAndPassword(email, password);
+    closePasscodeGate();
+    const db = loadDB();
+    const label = db.owner?.name || cred.user.email || 'Admin';
+    openAdminPortal({ role: 'super_admin', label, code: '(firebase-email)' });
+    document.getElementById('adminSignedInName').textContent = label + ' · ' + (cred.user.email || '');
+  } catch (e) {
+    console.warn('Email login failed', e);
+    const code = e && e.code;
+    if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+      errEl.textContent = 'Wrong email or password.';
+    } else if (code === 'auth/too-many-requests') {
+      errEl.textContent = 'Too many attempts. Try again later.';
+    } else {
+      errEl.textContent = (e && e.message) ? e.message : 'Sign-in failed.';
+    }
   }
 }
 
@@ -1396,6 +1442,7 @@ function closeAdminPortal() {
   activePortalKey = 'admin';
   adminEditingPortal = false;
   setAdminPortalTitle('Owner / Admin Portal');
+  try { if (_auth && _auth.currentUser) _auth.signOut(); } catch (e) { /* ignore */ }
   // Reflect any CMS edits made while inside the portal back onto the public page
   const db = loadDB();
   renderLeadershipPyramid(db);
@@ -2313,10 +2360,29 @@ function renderRegisterRollCall() {
   const db = loadDB();
   const reg = (db.classRegisters && db.classRegisters[activePortalKey]) || [];
   const readyCount = reg.filter(isReadyForGraduation).length;
+  const filterMode = window._regFilterMode || 'all'; // all | ready | notready
+  const searchQ = (window._regSearchQ || '').trim().toLowerCase();
+  let view = reg.slice();
+  if (filterMode === 'ready') view = view.filter(isReadyForGraduation);
+  else if (filterMode === 'notready') view = view.filter(r => !isReadyForGraduation(r));
+  if (searchQ) view = view.filter(r => (r.name || '').toLowerCase().includes(searchQ));
+  const notReadyCount = reg.length - readyCount;
 
   document.getElementById('adminContent').innerHTML = `
     <div class="admin-panel">
       <h3 class="admin-panel-title"><span class="ic">📝</span> Class Register — ${PORTAL_DEFS[activePortalKey].label}</h3>
+      <div class="wall-search-panel" style="margin-top:12px;margin-bottom:16px;">
+        <div class="wall-search-title"><span class="ic">🔎</span> Filter register</div>
+        <div class="wall-search-row">
+          <input type="text" id="regSearchInput" placeholder="Search by name..." value="${(window._regSearchQ||'').replace(/"/g,'&quot;')}">
+          <select id="regFilterSelect">
+            <option value="all" ${filterMode==='all'?'selected':''}>All (${reg.length})</option>
+            <option value="ready" ${filterMode==='ready'?'selected':''}>Ready (${readyCount})</option>
+            <option value="notready" ${filterMode==='notready'?'selected':''}>Not Ready (${notReadyCount})</option>
+          </select>
+        </div>
+        <p class="muted small" style="margin-top:8px;">Showing ${view.length} of ${reg.length} · Ready = ≥80% attendance with at least one mark</p>
+      </div>
       <p class="muted" style="margin-bottom:16px;">
         Mark <strong>O</strong> (Present) or <strong>X</strong> (Absent) each session. The battery shows attendance %.
         Status turns <span style="color:#4caf6e;font-weight:700;">Ready</span> at 80%+ (with at least one mark).
@@ -2337,7 +2403,7 @@ function renderRegisterRollCall() {
               </tr>
             </thead>
             <tbody>
-              ${reg.map((r, i) => {
+              ${view.map((r, i) => {
                 const pct = attendancePct(r);
                 const ready = isReadyForGraduation(r);
                 return `
@@ -2420,6 +2486,16 @@ function renderRegisterRollCall() {
     });
   });
 
+  
+  document.getElementById('regFilterSelect')?.addEventListener('change', e => {
+    window._regFilterMode = e.target.value;
+    renderRegisterRollCall();
+  });
+  document.getElementById('regSearchInput')?.addEventListener('input', e => {
+    window._regSearchQ = e.target.value;
+    clearTimeout(window._regSearchT);
+    window._regSearchT = setTimeout(() => renderRegisterRollCall(), 200);
+  });
   document.getElementById('regSendGradPreviewBtn')?.addEventListener('click', () => {
     if (!reg.length) return;
     registerViewMode = 'graduation-preview';
@@ -4512,9 +4588,13 @@ function renderAdminBooking() {
 function bookingNextAction(b) {
   const flow = { pending: 'confirmed', confirmed: 'checked-in', 'checked-in': 'checked-out' };
   const next = flow[b.status];
-  if (!next) return '';
-  const labels = { confirmed: 'Confirm', 'checked-in': 'Check-in', 'checked-out': 'Check-out' };
-  return `<button type="button" class="icon-btn small" data-advance="${b.id}" data-to="${next}">${labels[next]}</button>`;
+  const labels = { confirmed: 'Confirm M-Pesa', 'checked-in': 'Check-in', 'checked-out': 'Check-out' };
+  let html = '';
+  if (next) html += `<button type="button" class="icon-btn small" data-advance="${b.id}" data-to="${next}">${labels[next]}</button>`;
+  if (b.status === 'confirmed' || b.status === 'checked-in' || b.status === 'checked-out') {
+    html += ` <button type="button" class="icon-btn small gold" data-adminreceipt="${b.id}">Receipt</button>`;
+  }
+  return html;
 }
 
 function renderAdminBookingsList() {
@@ -4561,6 +4641,13 @@ function renderAdminBookingsList() {
   document.querySelectorAll('[data-advance]').forEach(btn => {
     btn.addEventListener('click', () => advanceBookingStatus(btn.dataset.advance, btn.dataset.to));
   });
+  document.querySelectorAll('[data-adminreceipt]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const dbNow = loadDB();
+      const bk = (dbNow.booking.bookings || []).find(x => x.id === btn.dataset.adminreceipt);
+      if (bk) openBookingReceipt(bk);
+    });
+  });
   document.querySelectorAll('[data-delbooking]').forEach(btn => {
     btn.addEventListener('click', () => deleteBooking(btn.dataset.delbooking));
   });
@@ -4571,11 +4658,63 @@ function advanceBookingStatus(id, to) {
   const b = db.booking.bookings.find(x => x.id === id);
   if (!b) return;
   b.status = to;
+  if (to === 'confirmed') {
+    b.confirmedAt = new Date().toISOString();
+    b.confirmedBy = db.owner?.name || 'Admin';
+  }
   saveDB(db);
   logAudit('super_admin', db.owner.name, `Booking marked ${to}`, b.fullName);
   renderAdminBookingsList();
   renderAdminSidebar();
   updateHeaderBellBadge(db);
+}
+
+function openBookingReceipt(booking) {
+  if (!booking) return;
+  const db = loadDB();
+  const issued = booking.confirmedAt ? new Date(booking.confirmedAt) : new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const dateStr = `${pad(issued.getDate())}/${pad(issued.getMonth()+1)}/${issued.getFullYear()}`;
+  const timeStr = `${pad(issued.getHours())}:${pad(issued.getMinutes())}`;
+  const items = (booking.requestedItems || []).map(it =>
+    `<tr><td>${it.name || 'Item'}</td><td style="text-align:right;">KES ${(it.cost||0).toLocaleString()}</td></tr>`
+  ).join('') || '<tr><td colspan="2" style="color:#666;">No extra items</td></tr>';
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Receipt — ${booking.id.slice(-6)}</title>
+  <style>
+    body{font-family:Georgia,serif;max-width:560px;margin:24px auto;padding:24px;color:#1a150c;border:1px solid #d4c4a0;}
+    h1{font-size:1.35rem;margin:0 0 4px;color:#a97f26;}
+    .sub{color:#666;font-size:.85rem;margin-bottom:20px;}
+    table{width:100%;border-collapse:collapse;margin:12px 0;}
+    td,th{padding:8px 4px;border-bottom:1px solid #eee;font-size:.9rem;text-align:left;}
+    .total{font-weight:700;font-size:1.05rem;}
+    .foot{margin-top:28px;padding-top:12px;border-top:1px solid #ccc;font-size:.75rem;color:#666;text-align:center;}
+    .badge{display:inline-block;background:#e8f5e9;color:#2e7d32;padding:4px 10px;font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;}
+    @media print{body{border:none;margin:0;}}
+  </style></head><body>
+  <h1>Mountain of the Lord Prayer Center — Katoloni</h1>
+  <div class="sub">Guest House Booking Receipt</div>
+  <span class="badge">Confirmed</span>
+  <table>
+    <tr><th>Receipt No.</th><td>${booking.id.slice(-8).toUpperCase()}</td></tr>
+    <tr><th>Issued</th><td>${dateStr} · ${timeStr}</td></tr>
+    <tr><th>Issued by</th><td>${booking.confirmedBy || db.owner?.name || 'Admin'}</td></tr>
+    <tr><th>Guest</th><td>${booking.fullName || '—'} · ${booking.phone || ''}</td></tr>
+    <tr><th>Room</th><td>${booking.roomName || '—'} (${booking.nights || 0} night(s))</td></tr>
+    <tr><th>Stay</th><td>${booking.checkIn || '—'} → ${booking.checkOut || '—'}</td></tr>
+    <tr><th>M-Pesa Txn</th><td>${booking.mpesaTxnId || '—'}</td></tr>
+  </table>
+  <table>
+    <tr><th>Description</th><th style="text-align:right;">Amount</th></tr>
+    <tr><td>Room (${booking.nights || 0} × KES ${(booking.rate||0).toLocaleString()})</td><td style="text-align:right;">KES ${(booking.roomTotal||0).toLocaleString()}</td></tr>
+    ${items}
+    <tr class="total"><td>Total</td><td style="text-align:right;">KES ${(booking.total||0).toLocaleString()}</td></tr>
+  </table>
+  <div class="foot">© ${issued.getFullYear()} Mountain of the Lord Prayer Center, Katoloni. All rights reserved.</div>
+  <p style="text-align:center;margin-top:16px;"><button onclick="window.print()">Print / Save as PDF</button></p>
+  </body></html>`;
+  const w = window.open('', '_blank', 'width=640,height=800');
+  if (w) { w.document.write(html); w.document.close(); }
+  else alert('Allow pop-ups to view the receipt.');
 }
 
 function deleteBooking(id) {
@@ -5514,13 +5653,22 @@ function handleCheckBooking() {
   if (!name) { el.innerHTML = '<p class="muted">Enter your full name to search.</p>'; return; }
   const matches = bookings.filter(b => (b.fullName || '').toLowerCase().includes(name));
   el.innerHTML = matches.length ? matches.map(b => `
-    <div class="cms-list-item">
+    <div class="cms-list-item" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
       <div>
         <strong>${b.roomName}</strong> <span class="muted small">— ${b.checkIn} to ${b.checkOut} · ${b.nights} night(s)</span>
         <div class="muted small">Total: KES ${b.total.toLocaleString()} · Status: <span class="status-badge status-${b.status}">${b.status}</span></div>
       </div>
+      ${b.status === 'confirmed' || b.status === 'checked-in' || b.status === 'checked-out'
+        ? `<button type="button" class="icon-btn gold small" data-receipt="${b.id}"><span class="ic">🧾</span> Receipt</button>`
+        : `<span class="muted small">Receipt available after Admin confirms M-Pesa</span>`}
     </div>
   `).join('') : '<p class="muted">No booking found under that name.</p>';
+  el.querySelectorAll('[data-receipt]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const bk = bookings.find(x => x.id === btn.dataset.receipt);
+      if (bk) openBookingReceipt(bk);
+    });
+  });
 }
 
 function initBookingPublic() {

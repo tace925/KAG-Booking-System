@@ -271,14 +271,35 @@
 </footer>
 
 <div class="passcode-overlay" id="passcodeOverlay">
-  <div class="passcode-box">
-    <h3><span class="ic">🔑</span> Admin Access</h3>
-    <p>Enter the admin passcode to continue.</p>
-    <input type="password" id="passcodeInput" placeholder="Enter passcode" autocomplete="off">
+  <div class="passcode-box wide" style="max-width:420px;">
+    <h3 id="passcodeTitle"><span class="ic">🔑</span> Admin Access</h3>
+    <p id="passcodeHint" class="muted small" style="margin-bottom:14px;">Sign in with email or passcode.</p>
+
+    <div id="adminLoginEmailBlock">
+      <div class="form-field" style="text-align:left;margin-bottom:10px;">
+        <label style="font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text-low);">Email</label>
+        <input type="email" id="loginEmailInput" placeholder="you@email.com" autocomplete="username">
+      </div>
+      <div class="form-field" style="text-align:left;margin-bottom:10px;">
+        <label style="font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text-low);">Password</label>
+        <input type="password" id="loginPasswordInput" placeholder="Firebase password" autocomplete="current-password">
+      </div>
+      <button type="button" class="icon-btn gold" id="emailLoginBtn" style="width:100%;justify-content:center;margin-bottom:12px;"><span class="ic">✉</span> Sign in with Email</button>
+      <div style="display:flex;align-items:center;gap:10px;margin:8px 0 14px;">
+        <span style="flex:1;height:1px;background:var(--line);"></span>
+        <span class="muted small">or passcode</span>
+        <span style="flex:1;height:1px;background:var(--line);"></span>
+      </div>
+    </div>
+
+    <div class="form-field" style="text-align:left;margin-bottom:10px;">
+      <label style="font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--text-low);" id="passcodeLabel">Passcode</label>
+      <input type="password" id="passcodeInput" placeholder="Enter passcode" autocomplete="off">
+    </div>
     <div class="passcode-error" id="passcodeError"></div>
     <div class="passcode-actions">
       <button type="button" class="icon-btn" id="passcodeCancel">Cancel</button>
-      <button type="button" class="icon-btn gold" id="passcodeSubmit"><span class="ic">🔓</span> Unlock</button>
+      <button type="button" class="icon-btn gold" id="passcodeSubmit"><span class="ic">🔓</span> Unlock with Passcode</button>
     </div>
   </div>
 </div>

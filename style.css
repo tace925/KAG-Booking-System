@@ -1180,3 +1180,14 @@ ul{ list-style:none; }
   .admin-sidebar{ width:100%; flex-direction:row; overflow-x:auto; border-right:none; border-bottom:1px solid var(--line); }
   .admin-side-btn{ width:auto; white-space:nowrap; }
 }
+/* Admin email + passcode gate */
+#passcodeOverlay input[type="email"],
+#passcodeOverlay input[type="password"],
+#passcodeOverlay input[type="text"]{
+  width:100%; padding:12px 14px; border-radius:var(--radius-sm);
+  background:var(--bg-panel-2); border:1px solid var(--line);
+  color:var(--text-hi); font-family:inherit; font-size:.9rem;
+}
+#passcodeOverlay input:focus{ outline:none; border-color:var(--gold); }
+#passcodeOverlay .form-field label{ display:block; margin-bottom:6px; }
+.passcode-error{ color:#e8607a; font-size:.82rem; min-height:1.2em; margin:8px 0; font-weight:600; }
