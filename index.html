@@ -35,7 +35,7 @@
 
   <div class="header-row wrap">
     <div class="brand">
-      <img class="brand-mark" src="img/kenya_ag_logo_transparent.png" alt="KAG Katoloni Prayer Center Logo">
+      <img class="brand-mark" src="img/kag.png" alt="KAG Katoloni Prayer Center Logo">
       <div class="brand-text">
         <div class="name-top">Mountain of the Lord</div>
         <div class="name-sub">Prayer Center, Katoloni</div>
@@ -62,7 +62,8 @@
 <main>
 
   <section class="page-section active band-dark" id="sec-home">
-    <div class="hero hero-full">
+    <div class="hero hero-full" id="homeHero">
+      <div class="hero-bg" id="homeHeroBg"></div>
       <div class="hero-glow"></div>
       <div class="hero-inner">
         <div class="divider divider-left"><span class="d-line"></span><span class="d-diamond"></span></div>
@@ -235,7 +236,7 @@
   <div class="wrap footer-top">
     <div class="footer-col footer-brand">
       <div class="brand">
-        <img class="brand-mark" src="img/kenya_ag_logo_transparent.png" alt="KAG Katoloni Prayer Center Logo">
+        <img class="brand-mark" src="img/kag.png" alt="KAG Katoloni Prayer Center Logo">
         <div class="brand-text">
           <div class="name-top">Mountain of the Lord</div>
           <div class="name-sub">Prayer Center, Katoloni</div>
@@ -319,6 +320,37 @@
     <div class="passcode-actions">
       <button type="button" class="icon-btn" id="deleteReasonCancelBtn">Cancel</button>
       <button type="button" class="icon-btn gold" id="deleteReasonConfirmBtn"><span class="ic" id="deleteReasonConfirmIcon">🗑</span> <span id="deleteReasonConfirmLabel">Delete</span></button>
+    </div>
+  </div>
+</div>
+
+
+<div class="passcode-overlay" id="libRequestOverlay">
+  <div class="passcode-box wide" style="max-width:440px;">
+    <h3><span class="ic">📚</span> Request Book</h3>
+    <p class="muted small" style="margin-bottom:8px;">Book: <strong id="libReqBookTitle">—</strong></p>
+    <input type="hidden" id="libReqItemId" value="">
+    <div class="form-field" style="text-align:left;margin-bottom:10px;">
+      <label style="font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;">Full name</label>
+      <input type="text" id="libReqName" placeholder="Your full name">
+    </div>
+    <div class="form-field" style="text-align:left;margin-bottom:10px;">
+      <label style="font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;">Phone number</label>
+      <input type="text" id="libReqPhone" placeholder="07XX XXX XXX">
+    </div>
+    <div class="form-field" style="text-align:left;margin-bottom:10px;">
+      <label style="font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;">Where are you from?</label>
+      <input type="text" id="libReqFrom" placeholder="Area / church / town">
+    </div>
+    <div class="form-field" style="text-align:left;margin-bottom:10px;">
+      <label style="font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;">Message (optional)</label>
+      <textarea id="libReqMessage" rows="3" placeholder="When can you pick up?"></textarea>
+    </div>
+    <div class="passcode-error" id="libReqError"></div>
+    <div id="libReqSuccess" style="color:#4caf6e;font-size:.88rem;font-weight:600;min-height:1.2em;"></div>
+    <div class="passcode-actions">
+      <button type="button" class="icon-btn" id="libReqCancelBtn">Cancel</button>
+      <button type="button" class="icon-btn gold" id="libReqSubmitBtn"><span class="ic">✉</span> Send</button>
     </div>
   </div>
 </div>

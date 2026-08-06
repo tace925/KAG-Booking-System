@@ -110,6 +110,7 @@ async function bootApp() {
         if (!db.memberDocuments) db.memberDocuments = [];
         if (!db.protocolDraftMembers) db.protocolDraftMembers = [];
         if (!db.classRegisters) db.classRegisters = { disciple1: [], disciple2: [], disciple3: [] };
+        if (db.heroBackground === undefined) db.heroBackground = '';
         localStorage.setItem(DB_KEY, JSON.stringify(db));
         _cloudReady = true;
         console.info('Loaded DB from Firestore.');
@@ -138,6 +139,7 @@ async function bootApp() {
   renderPublicProject(db);
   renderPublicWall(db);
   renderPublicLibrary(db);
+  initLibRequestForm();
   initMenuAndSettings();
   initAdminPortal();
   initBookingPublic();
@@ -599,6 +601,27 @@ function initTyping() {
 }
 
 /* ---------------- Leadership flip-card pyramid (3 / 5 / 2) ---------------- */
+function applyHeroBackground(db) {
+  const hero = document.getElementById('homeHero');
+  const bg = document.getElementById('homeHeroBg');
+  if (!hero || !bg) return;
+  const url = (db && db.heroBackground) || '';
+  if (url) {
+    bg.style.backgroundImage = 'url("' + url + '")';
+    bg.style.backgroundSize = 'cover';
+    bg.style.backgroundPosition = 'center center';
+    bg.style.backgroundRepeat = 'no-repeat';
+    bg.style.opacity = '1';
+    bg.style.width = '100%';
+    bg.style.height = '100%';
+    hero.classList.add('has-photo');
+  } else {
+    bg.style.backgroundImage = '';
+    bg.style.opacity = '0';
+    hero.classList.remove('has-photo');
+  }
+}
+
 function renderLeadershipPyramid(db) {
   const container = document.getElementById('leadershipPyramid');
   const people = db.leadership || [];
@@ -1485,6 +1508,7 @@ function closeAdminPortal() {
   // Reflect any CMS edits made while inside the portal back onto the public page
   const db = loadDB();
   renderLeadershipPyramid(db);
+  applyHeroBackground(db);
   renderNoticeboard(db);
   renderPublicTour(db);
   renderPublicProject(db);
@@ -1508,9 +1532,20 @@ function closeAdminPortal() {
 function libraryAlertCount(db) {
   const lib = db.library || {};
   const pendingReq = (lib.requests || []).filter(r => r.status === 'pending').length;
-  const today = new Date().toISOString().slice(0, 10);
-  const overdue = (lib.loans || []).filter(l => l.status === 'out' && l.dueAt && l.dueAt < today).length;
+  const overdue = (lib.loans || []).filter(isLoanOverdue).length;
   return pendingReq + overdue;
+}
+function isLoanOverdue(l) {
+  if (!l || l.status !== 'out' || !l.dueAt) return false;
+  const due = new Date(l.dueAt).getTime();
+  return !isNaN(due) && due < Date.now();
+}
+function formatLibDeadline(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return String(iso);
+  const pad = n => String(n).padStart(2, '0');
+  return pad(d.getDate()) + '/' + pad(d.getMonth()+1) + '/' + d.getFullYear() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
 }
 
 /* NEW: pending guest-house bookings awaiting admin action */
@@ -3453,6 +3488,25 @@ function renderAdminProfile() {
     </div>
 
     ${leadershipManagementPanelHTML(db)}
+
+    <div class="admin-panel">
+      <h3 class="admin-panel-title"><span class="ic">🖼</span> Home Hero Background</h3>
+      <p class="muted small" style="margin-bottom:14px;">
+        Upload a full-width background photo for the home welcome section (like a cover photo). Text stays readable with a dark overlay.
+      </p>
+      <div class="cms-image-preview" id="heroBgPreview" style="max-width:100%;border-radius:12px;overflow:hidden;border:1px solid var(--line);margin-bottom:12px;background:var(--bg-panel-2);display:flex;align-items:center;justify-content:center;aspect-ratio:16/6;">
+        ${db.heroBackground ? `<img src="${db.heroBackground}" alt="Hero background" style="width:100%;height:100%;object-fit:cover;">` : `<span class="muted">No background set — solid theme is used</span>`}
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <label class="file-btn icon-btn small">
+          <input type="file" id="heroBgInput" accept="image/*" hidden>
+          Upload photo
+        </label>
+        <button type="button" class="icon-btn gold small" id="heroBgSaveBtn"><span class="ic">💾</span> Save background</button>
+        <button type="button" class="icon-btn small" id="heroBgClearBtn" style="color:#e8607a;">Remove</button>
+      </div>
+      <p id="heroBgMsg" class="muted small" style="margin-top:10px;"></p>
+    </div>
   `;
 
   let pendingPhoto = null;
@@ -3478,6 +3532,43 @@ function renderAdminProfile() {
     renderAdminProfile();
   });
 
+  // Hero background
+  let pendingHeroBg = db.heroBackground || '';
+  document.getElementById('heroBgInput')?.addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    try {
+      pendingHeroBg = await fileToBase64(file, 1600, 0.72);
+      const prev = document.getElementById('heroBgPreview');
+      if (prev) prev.innerHTML = `<img src="${pendingHeroBg}" alt="Hero background" style="width:100%;height:100%;object-fit:cover;">`;
+      const msg = document.getElementById('heroBgMsg');
+      if (msg) msg.textContent = 'Preview ready — click Save background.';
+    } catch (err) {
+      alert('Could not read image.');
+    }
+  });
+  document.getElementById('heroBgSaveBtn')?.addEventListener('click', () => {
+    const dbNow = loadDB();
+    dbNow.heroBackground = pendingHeroBg || '';
+    saveDB(dbNow);
+    applyHeroBackground(dbNow);
+    logAudit('super_admin', dbNow.owner.name, 'Updated home hero background');
+    const msg = document.getElementById('heroBgMsg');
+    if (msg) msg.textContent = 'Background saved. Check the Home page.';
+  });
+  document.getElementById('heroBgClearBtn')?.addEventListener('click', () => {
+    if (!confirm('Remove the hero background photo?')) return;
+    pendingHeroBg = '';
+    const dbNow = loadDB();
+    dbNow.heroBackground = '';
+    saveDB(dbNow);
+    applyHeroBackground(dbNow);
+    const prev = document.getElementById('heroBgPreview');
+    if (prev) prev.innerHTML = `<span class="muted">No background set — solid theme is used</span>`;
+    const msg = document.getElementById('heroBgMsg');
+    if (msg) msg.textContent = 'Background removed.';
+  });
+
   initLeadershipManagementHandlers();
 }
 
@@ -3491,6 +3582,7 @@ const LEADERSHIP_TIER_LABELS = {
   2: 'Tier 2 — Deacons',
   3: 'Tier 3 — Officers'
 };
+
 
 function leadershipTierOptionsHTML(selected) {
   return [1, 2, 3].map(t => `<option value="${t}" ${+selected === t ? 'selected' : ''}>${LEADERSHIP_TIER_LABELS[t]}</option>`).join('');
@@ -3722,6 +3814,7 @@ function renderAdminInvite() {
                 <td class="table-actions" style="display:flex;gap:6px;flex-wrap:wrap;">
                   ${!p.revoked && email ? `<button type="button" class="icon-btn small" data-resetmail="${p.id}" title="Send password reset email"><span class="ic">✉</span> Reset Link</button>` : ''}
                   ${!p.revoked ? `<button type="button" class="icon-btn small" data-revokepass="${p.id}" style="color:#e8607a;">Revoke</button>` : ''}
+                  <button type="button" class="icon-btn small" data-delpass="${p.id}" title="Delete record" style="color:#e8607a;">🗑 Bin</button>
                 </td>
               </tr>`;
             }).join('') : `<tr><td colspan="7" class="muted" style="text-align:center;padding:24px;">No leaders invited yet</td></tr>`}
@@ -3785,7 +3878,23 @@ function renderAdminInvite() {
     });
   });
 
-  document.querySelectorAll('[data-resetmail]').forEach(btn => {
+  
+  document.querySelectorAll('[data-delpass]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = btn.getAttribute('data-delpass');
+      const dbNow = loadDB();
+      const rec = (dbNow.passcodes || []).find(p => p.id === id);
+      if (!rec) { alert('Record not found.'); return; }
+      if (!confirm('Permanently delete invite record for ' + (rec.label || 'this leader') + '?')) return;
+      dbNow.passcodes = (dbNow.passcodes || []).filter(p => p.id !== id);
+      saveDB(dbNow);
+      logAudit('super_admin', dbNow.owner.name, 'Deleted portal invite record', rec.label || '');
+      renderAdminInvite();
+    });
+  });
+document.querySelectorAll('[data-resetmail]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const dbNow = loadDB();
       const rec = dbNow.passcodes.find(p => p.id === btn.dataset.resetmail);
@@ -5124,31 +5233,69 @@ function openLibRequest(itemId) {
   const db = loadDB();
   const item = (db.library.items || []).find(i => i.id === itemId);
   if (!item) return;
-  const name = prompt('Your full name (required):');
-  if (!name || !name.trim()) return;
-  const phone = prompt('Phone number (required):') || '';
-  if (!phone.trim()) { alert('Phone is required so we can reach you.'); return; }
-  const message = prompt('Optional message (e.g. when you can pick up):') || '';
-  const dbNow = loadDB();
-  if (!dbNow.library.requests) dbNow.library.requests = [];
-  dbNow.library.requests.unshift({
+  const overlay = document.getElementById('libRequestOverlay');
+  if (!overlay) { alert('Request form missing. Refresh the page.'); return; }
+  document.getElementById('libReqItemId').value = itemId;
+  document.getElementById('libReqBookTitle').textContent = item.title || item.name || 'Book';
+  document.getElementById('libReqName').value = '';
+  document.getElementById('libReqPhone').value = '';
+  document.getElementById('libReqFrom').value = '';
+  document.getElementById('libReqMessage').value = '';
+  document.getElementById('libReqError').textContent = '';
+  document.getElementById('libReqSuccess').textContent = '';
+  overlay.classList.add('active');
+  const cancelBtn = document.getElementById('libReqCancelBtn');
+  const sendBtn = document.getElementById('libReqSubmitBtn');
+  if (cancelBtn) cancelBtn.onclick = (e) => { e.preventDefault(); closeLibRequest(); };
+  if (sendBtn) sendBtn.onclick = (e) => { e.preventDefault(); submitLibRequest(); };
+  setTimeout(() => document.getElementById('libReqName')?.focus(), 50);
+}
+
+function closeLibRequest() {
+  document.getElementById('libRequestOverlay')?.classList.remove('active');
+}
+
+function submitLibRequest() {
+  const itemId = document.getElementById('libReqItemId')?.value;
+  const name = (document.getElementById('libReqName')?.value || '').trim();
+  const phone = (document.getElementById('libReqPhone')?.value || '').trim();
+  const from = (document.getElementById('libReqFrom')?.value || '').trim();
+  const message = (document.getElementById('libReqMessage')?.value || '').trim();
+  const err = document.getElementById('libReqError');
+  const ok = document.getElementById('libReqSuccess');
+  if (err) err.textContent = '';
+  if (ok) ok.textContent = '';
+  if (!name || !phone || !from) {
+    if (err) err.textContent = 'Please fill in name, phone, and where you are from.';
+    return;
+  }
+  const db = loadDB();
+  const item = (db.library.items || []).find(i => i.id === itemId);
+  if (!item) { if (err) err.textContent = 'Book not found.'; return; }
+  if (!db.library.requests) db.library.requests = [];
+  db.library.requests.unshift({
     id: uid('lreq'),
     itemId,
     itemTitle: item.title || item.name,
-    name: name.trim(),
-    phone: phone.trim(),
-    message: message.trim(),
+    name, phone, from, message,
     at: new Date().toISOString(),
     status: 'pending'
   });
-  saveDB(dbNow);
-  logAudit('guest', name.trim(), 'Requested library book', item.title || item.name);
-  alert('Request sent! The library team will contact you.');
-  updateHeaderBellBadge(dbNow);
-  renderPublicLibrary(dbNow);
+  saveDB(db);
+  logAudit('guest', name, 'Requested library book', item.title || item.name);
+  if (ok) ok.textContent = 'Request sent! The library team will contact you.';
+  updateHeaderBellBadge(db);
+  setTimeout(() => { closeLibRequest(); renderPublicLibrary(loadDB()); }, 900);
 }
 
-/* ---------- Library CMS (Admin) ---------- */
+function initLibRequestForm() {
+  document.getElementById('libReqCancelBtn')?.addEventListener('click', closeLibRequest);
+  document.getElementById('libReqSubmitBtn')?.addEventListener('click', submitLibRequest);
+  document.getElementById('libRequestOverlay')?.addEventListener('click', e => {
+    if (e.target.id === 'libRequestOverlay') closeLibRequest();
+  });
+}
+
 function renderAdminLibrary() {
   const db = loadDB();
   const lib = db.library;
@@ -5285,48 +5432,57 @@ function renderAdminLibrary() {
   }
 
   function paintLoans() {
-    const loans = [...(lib.loans || [])].sort((a, b) => (a.status === 'out' ? 0 : 1) - (b.status === 'out' ? 0 : 1));
+    const loans = lib.loans || [];
+    const overdueN = loans.filter(isLoanOverdue).length;
     sub.innerHTML = `
       <div class="admin-panel">
-        <h3 class="admin-panel-title"><span class="ic">📤</span> Loans</h3>
-        ${loans.filter(l => l.status === 'out' && l.dueAt && l.dueAt < new Date().toISOString().slice(0, 10)).length ? `
-          <div class="lib-overdue-banner">⚠ ${loans.filter(l => l.status === 'out' && l.dueAt && l.dueAt < new Date().toISOString().slice(0, 10)).length} overdue loan(s) — follow up with the borrower.</div>
-        ` : ''}
-        <div class="cms-list">
-          ${loans.map(l => {
-            const item = lib.items.find(i => i.id === l.itemId);
-            const today = new Date().toISOString().slice(0, 10);
-            const overdueFlag = l.status === 'out' && l.dueAt && l.dueAt < today;
-            let daysHeld = 0;
-            if (l.borrowedAt) {
-              const end = l.returnedAt || today;
-              daysHeld = Math.max(0, Math.round((new Date(end) - new Date(l.borrowedAt)) / 86400000));
-            }
-            return `
-              <div class="cms-list-item ${overdueFlag ? 'lib-overdue-row' : ''}">
-                <div>
-                  <strong>${item ? (item.title || item.name) : 'Unknown book'}</strong>
-                  <div class="muted small">${l.borrowerName}${l.borrowerPhone ? ' · ' + l.borrowerPhone : ''} · out ${l.borrowedAt} · due ${l.dueAt || '—'} · <strong>${daysHeld} day${daysHeld === 1 ? '' : 's'} held</strong></div>
-                </div>
-                <div class="table-actions">
-                  ${overdueFlag ? '<span class="status-badge status-pending">⚠ Overdue</span>' : ''}
-                  ${l.status === 'out'
-                    ? `<button type="button" class="icon-btn small gold" data-return="${l.id}">Mark Returned</button>`
-                    : `<span class="status-badge status-checked-out">Returned ${l.returnedAt || ''}</span>`}
-                </div>
-              </div>`;
-          }).join('') || '<p class="muted">No loans recorded yet.</p>'}
+        <h3 class="admin-panel-title"><span class="ic">📤</span> Loans
+          ${overdueN ? `<span class="badge-count inline">${overdueN} overdue</span>` : ''}
+        </h3>
+        ${overdueN ? `<div class="lib-overdue-banner">⚠ ${overdueN} overdue loan(s) — follow up with the borrower.</div>` : ''}
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead><tr><th>Book</th><th>Borrower</th><th>Borrowed</th><th>Deadline</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+              ${loans.length ? loans.map(l => {
+                const item = (lib.items || []).find(i => i.id === l.itemId);
+                const title = l.itemTitle || (item && (item.title || item.name)) || '—';
+                const overdue = isLoanOverdue(l);
+                return `<tr class="${overdue ? 'lib-overdue-row' : ''}">
+                  <td>${title}</td>
+                  <td>${l.borrowerName || '—'}<br><span class="muted small">${l.borrowerPhone || ''}${l.borrowerFrom ? ' · ' + l.borrowerFrom : ''}</span></td>
+                  <td class="muted small">${l.borrowedAt ? formatLibDeadline(l.borrowedAt) : '—'}</td>
+                  <td class="muted small">${formatLibDeadline(l.dueAt)}${overdue ? ' <strong style="color:#e8607a;">OVERDUE</strong>' : ''}</td>
+                  <td><span class="status-badge">${l.status}${overdue ? ' · overdue' : ''}</span></td>
+                  <td class="table-actions">
+                    ${l.status === 'out' ? `<button type="button" class="icon-btn small" data-returnloan="${l.id}">Returned</button>` : ''}
+                    <button type="button" class="mini-del" data-delloan="${l.id}" title="Delete">🗑</button>
+                  </td>
+                </tr>`;
+              }).join('') : `<tr><td colspan="6" class="muted" style="text-align:center;padding:24px;">No loans yet</td></tr>`}
+            </tbody>
+          </table>
         </div>
       </div>`;
-    sub.querySelectorAll('[data-return]').forEach(btn => {
+    sub.querySelectorAll('[data-returnloan]').forEach(btn => {
       btn.addEventListener('click', () => {
         const dbNow = loadDB();
-        const loan = dbNow.library.loans.find(l => l.id === btn.dataset.return);
-        if (!loan) return;
-        loan.status = 'returned';
-        loan.returnedAt = new Date().toISOString().slice(0, 10);
+        const l = (dbNow.library.loans || []).find(x => x.id === btn.dataset.returnloan);
+        if (!l) return;
+        l.status = 'returned';
+        l.returnedAt = new Date().toISOString();
         saveDB(dbNow);
-        logAudit('super_admin', dbNow.owner.name, 'Returned library item', loan.borrowerName);
+        updateHeaderBellBadge(dbNow);
+        renderAdminSidebar();
+        renderAdminLibrary();
+      });
+    });
+    sub.querySelectorAll('[data-delloan]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!confirm('Delete this loan record?')) return;
+        const dbNow = loadDB();
+        dbNow.library.loans = (dbNow.library.loans || []).filter(x => x.id !== btn.dataset.delloan);
+        saveDB(dbNow);
         updateHeaderBellBadge(dbNow);
         renderAdminSidebar();
         renderAdminLibrary();
@@ -5336,56 +5492,93 @@ function renderAdminLibrary() {
 
   function paintRequests() {
     const reqs = lib.requests || [];
+    const pending = reqs.filter(r => r.status === 'pending');
     sub.innerHTML = `
       <div class="admin-panel">
-        <h3 class="admin-panel-title"><span class="ic">📥</span> Book Requests</h3>
+        <h3 class="admin-panel-title"><span class="ic">📥</span> Book Requests
+          ${pending.length ? `<span class="badge-count inline">${pending.length}</span>` : ''}
+        </h3>
+        <p class="muted small" style="margin-bottom:12px;">Confirm → set deadline & create loan. Reject or bin deletes the request.</p>
         <div class="cms-list">
-          ${reqs.map(r => `
-            <div class="cms-list-item">
-              <div>
+          ${reqs.length ? reqs.map(r => `
+            <div class="cms-list-item" style="flex-wrap:wrap;gap:10px;">
+              <div style="flex:1;min-width:200px;">
                 <strong>${r.itemTitle || 'Book'}</strong>
-                <div class="muted small">${r.name} · ${r.phone} · ${new Date(r.at).toLocaleDateString()}${r.message ? ' · "' + r.message + '"' : ''}</div>
+                <span class="status-badge">${r.status}</span>
+                <div class="muted small">${r.name || ''} · ${r.phone || ''}${r.from ? ' · From: ' + r.from : ''}</div>
+                ${r.message ? `<div class="muted small">“${r.message}”</div>` : ''}
+                <div class="muted small">${r.at ? new Date(r.at).toLocaleString() : ''}</div>
               </div>
-              <div class="table-actions">
-                <span class="status-badge status-${r.status === 'pending' ? 'pending' : r.status === 'fulfilled' ? 'checked-in' : 'checked-out'}">${r.status}</span>
+              <div class="table-actions" style="display:flex;gap:6px;flex-wrap:wrap;">
                 ${r.status === 'pending' ? `
-                  <button type="button" class="icon-btn small gold" data-fulfill="${r.id}">Fulfill</button>
-                  <button type="button" class="icon-btn small" data-decline="${r.id}">Decline</button>
+                  <button type="button" class="icon-btn small gold" data-libconfirm="${r.id}"><span class="ic">✓</span> Confirm</button>
+                  <button type="button" class="icon-btn small" data-libreject="${r.id}" style="color:#e8607a;">Reject</button>
                 ` : ''}
+                <button type="button" class="mini-del" data-libdelreq="${r.id}" title="Delete">🗑</button>
               </div>
-            </div>`).join('') || '<p class="muted">No requests yet.</p>'}
+            </div>`).join('') : '<p class="muted">No requests yet.</p>'}
         </div>
       </div>`;
-    sub.querySelectorAll('[data-fulfill]').forEach(btn => {
+
+    sub.querySelectorAll('[data-libconfirm]').forEach(btn => {
       btn.addEventListener('click', () => {
         const dbNow = loadDB();
-        const r = dbNow.library.requests.find(x => x.id === btn.dataset.fulfill);
+        const r = (dbNow.library.requests || []).find(x => x.id === btn.dataset.libconfirm);
         if (!r) return;
+        const deadlineLocal = prompt(
+          'Set return deadline\\nYYYY-MM-DD or YYYY-MM-DD HH:MM\\nExample: 2026-08-20 17:00',
+          libDueDate(14) + ' 17:00'
+        );
+        if (!deadlineLocal || !deadlineLocal.trim()) return;
+        const raw = deadlineLocal.trim();
+        let dueAt;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) dueAt = raw + 'T17:00:00';
+        else if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(raw)) {
+          dueAt = raw.replace(' ', 'T');
+          if (dueAt.length === 16) dueAt += ':00';
+        } else {
+          alert('Invalid date. Use YYYY-MM-DD or YYYY-MM-DD HH:MM');
+          return;
+        }
+        if (isNaN(new Date(dueAt).getTime())) { alert('Could not parse deadline.'); return; }
         r.status = 'fulfilled';
-        // auto-create loan
         if (!dbNow.library.loans) dbNow.library.loans = [];
         dbNow.library.loans.unshift({
           id: uid('loan'),
           itemId: r.itemId,
+          itemTitle: r.itemTitle,
           borrowerName: r.name,
           borrowerPhone: r.phone,
-          borrowedAt: new Date().toISOString().slice(0, 10),
-          dueAt: libDueDate(14),
+          borrowerFrom: r.from || '',
+          borrowedAt: new Date().toISOString(),
+          dueAt,
           returnedAt: null,
           status: 'out'
         });
         saveDB(dbNow);
-        alert('Request fulfilled and loan recorded.');
+        logAudit('super_admin', dbNow.owner.name, 'Confirmed library request → loan', r.name);
+        alert('Confirmed. Loan created. Due: ' + formatLibDeadline(dueAt));
         updateHeaderBellBadge(loadDB());
         renderAdminSidebar();
         renderAdminLibrary();
       });
     });
-    sub.querySelectorAll('[data-decline]').forEach(btn => {
+    sub.querySelectorAll('[data-libreject]').forEach(btn => {
       btn.addEventListener('click', () => {
+        if (!confirm('Reject and delete this request?')) return;
         const dbNow = loadDB();
-        const r = dbNow.library.requests.find(x => x.id === btn.dataset.decline);
-        if (r) r.status = 'declined';
+        dbNow.library.requests = (dbNow.library.requests || []).filter(x => x.id !== btn.dataset.libreject);
+        saveDB(dbNow);
+        updateHeaderBellBadge(dbNow);
+        renderAdminSidebar();
+        renderAdminLibrary();
+      });
+    });
+    sub.querySelectorAll('[data-libdelreq]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!confirm('Delete this request record?')) return;
+        const dbNow = loadDB();
+        dbNow.library.requests = (dbNow.library.requests || []).filter(x => x.id !== btn.dataset.libdelreq);
         saveDB(dbNow);
         updateHeaderBellBadge(dbNow);
         renderAdminSidebar();
