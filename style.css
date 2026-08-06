@@ -1191,3 +1191,11 @@ ul{ list-style:none; }
 #passcodeOverlay input:focus{ outline:none; border-color:var(--gold); }
 #passcodeOverlay .form-field label{ display:block; margin-bottom:6px; }
 .passcode-error{ color:#e8607a; font-size:.82rem; min-height:1.2em; margin:8px 0; font-weight:600; }
+
+
+/* Logo image (replaces SVG mark) */
+img.brand-mark{
+  width:48px; height:48px; object-fit:contain; flex-shrink:0;
+  display:block;
+}
+.footer-brand img.brand-mark{ width:44px; height:44px; }

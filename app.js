@@ -861,12 +861,36 @@ function renderPublicWall(db) {
   const el = document.getElementById('wallContent');
   if (!el) return;
   const graduates = db.graduates || [];
+  const months = WALL_MONTHS || ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  // Preserve focus/cursor across re-renders
+  const prevFocusId = document.activeElement && document.activeElement.id;
+  const prevSelStart = (document.activeElement && document.activeElement.selectionStart) || 0;
+  const prevSelEnd = (document.activeElement && document.activeElement.selectionEnd) || 0;
+
+  const normMonth = (m) => {
+    if (!m) return '';
+    const s = String(m).trim();
+    const found = months.find(x => x.toLowerCase() === s.toLowerCase() || x.toLowerCase().startsWith(s.toLowerCase().slice(0, 3)));
+    return found || s;
+  };
 
   const matches = (g) => {
-    if (g.status !== 'active') return false;
-    if (publicWallFilter.name && !(g.name || '').toLowerCase().includes(publicWallFilter.name)) return false;
-    if (publicWallFilter.month && g.month !== publicWallFilter.month) return false;
-    if (publicWallFilter.year && String(g.year) !== String(publicWallFilter.year)) return false;
+    if (g.status && g.status !== 'active') return false;
+    const q = (publicWallFilter.name || '').trim().toLowerCase();
+    if (q) {
+      const nm = (g.name || '').toLowerCase();
+      if (!nm.includes(q)) return false;
+    }
+    if (publicWallFilter.month) {
+      const gm = normMonth(g.month);
+      if (gm !== publicWallFilter.month) return false;
+    }
+    if (publicWallFilter.year) {
+      const gy = String(g.year || '').trim();
+      const fy = String(publicWallFilter.year).trim();
+      if (!gy.startsWith(fy) && gy !== fy) return false;
+    }
     return true;
   };
 
@@ -892,32 +916,39 @@ function renderPublicWall(db) {
   };
 
   const filteredAny = graduates.some(matches);
-  const hasAny = graduates.some(g => g.status === 'active');
-  const months = WALL_MONTHS || ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const hasAny = graduates.some(g => !g.status || g.status === 'active');
+  // Keep original casing in the input (filter uses lowercase internally)
+  const displayName = publicWallFilter._displayName != null ? publicWallFilter._displayName : (publicWallFilter.name || '');
+  const displayYear = publicWallFilter.year || '';
 
   el.innerHTML = `
     <div class="wall-search-panel">
       <div class="wall-search-title"><span class="ic">🔍</span> Search &amp; Filter</div>
       <div class="wall-search-row">
-        <input type="text" id="pubWallSearchName" placeholder="Search by name..." value="${publicWallFilter.name || ''}">
+        <input type="text" id="pubWallSearchName" placeholder="Search by name..." value="${String(displayName).replace(/"/g, '&quot;')}" autocomplete="off">
         <select id="pubWallSearchMonth">
           <option value="">All Months</option>
           ${months.map(m => `<option value="${m}" ${publicWallFilter.month === m ? 'selected' : ''}>${m}</option>`).join('')}
         </select>
-        <input type="text" id="pubWallSearchYear" placeholder="Year" value="${publicWallFilter.year || ''}" inputmode="numeric">
+        <input type="text" id="pubWallSearchYear" placeholder="Year" value="${String(displayYear).replace(/"/g, '&quot;')}" inputmode="numeric" autocomplete="off">
       </div>
+      ${hasAny ? `<p class="muted small" style="margin-top:10px;">${filteredAny ? 'Showing matching graduates.' : 'No graduates match your search — clear filters to see all.'}</p>` : ''}
     </div>
-    ${WALL_CATEGORY_ORDER.map(catSection).join('')}
-    ${!hasAny ? `
-      <div class="coming-soon"><div class="ic">👥</div>Graduate records will appear here as classes complete.</div>
-    ` : (!filteredAny ? `
-      <div class="coming-soon"><div class="ic">🔍</div>No graduates match your search.</div>
-    ` : '')}
+    <div id="pubWallResults">
+      ${WALL_CATEGORY_ORDER.map(catSection).join('')}
+      ${!hasAny ? `
+        <div class="coming-soon"><div class="ic">👥</div>Graduate records will appear here as classes complete.</div>
+      ` : (!filteredAny ? `
+        <div class="coming-soon"><div class="ic">🔍</div>No graduates match your search.</div>
+      ` : '')}
+    </div>
   `;
 
   const apply = () => {
+    const nameRaw = document.getElementById('pubWallSearchName')?.value || '';
     publicWallFilter = {
-      name: (document.getElementById('pubWallSearchName')?.value || '').trim().toLowerCase(),
+      name: nameRaw.trim().toLowerCase(),
+      _displayName: nameRaw,
       month: document.getElementById('pubWallSearchMonth')?.value || '',
       year: (document.getElementById('pubWallSearchYear')?.value || '').trim()
     };
@@ -926,6 +957,14 @@ function renderPublicWall(db) {
   document.getElementById('pubWallSearchName')?.addEventListener('input', apply);
   document.getElementById('pubWallSearchMonth')?.addEventListener('change', apply);
   document.getElementById('pubWallSearchYear')?.addEventListener('input', apply);
+
+  if (prevFocusId === 'pubWallSearchName' || prevFocusId === 'pubWallSearchYear') {
+    const node = document.getElementById(prevFocusId);
+    if (node) {
+      node.focus();
+      try { node.setSelectionRange(prevSelStart, prevSelEnd); } catch (e) {}
+    }
+  }
 }
 
 /* ---------------- Header buttons: Menu dropdown → portal picker, Terminal ---------------- */
@@ -3622,22 +3661,26 @@ function initLeadershipManagementHandlers() {
   });
 }
 
-/* ---------- Invite tab (placeholder only) ---------- */
+/* ---------- Invite tab — portal leaders + reset link + revoke ---------- */
 function renderAdminInvite() {
   const db = loadDB();
   const portalRoles = ['bishop', 'protocol', 'disciple1', 'disciple2', 'disciple3'];
-  const issued = db.passcodes.filter(p => portalRoles.includes(p.role));
+  const issued = (db.passcodes || []).filter(p => portalRoles.includes(p.role));
 
   document.getElementById('adminContent').innerHTML = `
     <div class="admin-panel">
       <h3 class="admin-panel-title"><span class="ic">🔑</span> Invite a Portal Leader</h3>
-      <p class="muted" style="margin-bottom:18px;">Enter the leader's details, choose their portal, then generate a passcode for them to log in with.</p>
+      <p class="muted" style="margin-bottom:18px;">
+        Enter the leader's details, choose their portal, then send invite.
+        They log in with the generated <strong>passcode</strong>. Use <strong>Reset Link</strong> to email a Firebase password-reset
+        (works only if that email already exists under Authentication → Users).
+      </p>
       <div class="form-row">
         <div class="form-field"><label>Full Name</label><input type="text" id="inviteName" placeholder="Full name"></div>
-        <div class="form-field"><label>Phone</label><input type="text" id="invitePhone" placeholder="07XX XXX XXX"></div>
+        <div class="form-field"><label>Email</label><input type="email" id="inviteEmail" placeholder="name@email.com"></div>
       </div>
       <div class="form-row">
-        <div class="form-field"><label>Email</label><input type="text" id="inviteEmail" placeholder="name@email.com"></div>
+        <div class="form-field"><label>Phone Number</label><input type="text" id="invitePhone" placeholder="07XX XXX XXX"></div>
         <div class="form-field">
           <label>Portal</label>
           <select id="invitePortal">
@@ -3649,26 +3692,39 @@ function renderAdminInvite() {
           </select>
         </div>
       </div>
-      <button type="button" class="icon-btn gold" id="inviteGenerateBtn"><span class="ic">🔑</span> Generate Passcode</button>
+      <button type="button" class="icon-btn gold" id="inviteGenerateBtn"><span class="ic">✉</span> Send Invite</button>
+      <p id="inviteMsg" class="muted small" style="margin-top:12px;"></p>
     </div>
 
     <div class="admin-panel">
-      <h3 class="admin-panel-title"><span class="ic">📋</span> Issued Passcodes</h3>
+      <h3 class="admin-panel-title"><span class="ic">📋</span> Portal Leader Records</h3>
       <div class="admin-table-wrap">
         <table class="admin-table">
-          <thead><tr><th>Portal</th><th>Leader</th><th>Passcode</th><th>Issued</th><th>Actions</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Name</th><th>Email</th><th>Phone</th><th>Portal</th><th>Passcode</th><th>Status</th><th>Actions</th>
+            </tr>
+          </thead>
           <tbody>
-            ${issued.length ? issued.map(p => `
+            ${issued.length ? issued.map(p => {
+              const email = p.email || (db.portalProfiles[p.role] && db.portalProfiles[p.role].email) || '';
+              const phone = p.phone || (db.portalProfiles[p.role] && db.portalProfiles[p.role].phone) || '—';
+              const status = p.revoked ? 'Revoked' : 'Active';
+              const statusColor = p.revoked ? '#e8607a' : '#4caf6e';
+              return `
               <tr>
+                <td>${p.label || '—'}</td>
+                <td>${email || '—'}</td>
+                <td>${phone}</td>
                 <td>${PORTAL_DEFS[p.role]?.label || p.role}</td>
-                <td>${p.label}</td>
-                <td style="font-family:monospace; color:var(--gold); font-weight:700;">${p.revoked ? 'REVOKED' : p.code}</td>
-                <td>${new Date(p.generatedAt).toLocaleDateString()}</td>
-                <td class="table-actions">
-                  ${!p.revoked ? `<button type="button" class="mini-del" data-revokepass="${p.id}" title="Revoke">✕</button>` : ''}
+                <td style="font-family:monospace;color:var(--gold);font-weight:700;">${p.revoked ? '—' : p.code}</td>
+                <td style="color:${statusColor};font-weight:700;">${status}</td>
+                <td class="table-actions" style="display:flex;gap:6px;flex-wrap:wrap;">
+                  ${!p.revoked && email ? `<button type="button" class="icon-btn small" data-resetmail="${p.id}" title="Send password reset email"><span class="ic">✉</span> Reset Link</button>` : ''}
+                  ${!p.revoked ? `<button type="button" class="icon-btn small" data-revokepass="${p.id}" style="color:#e8607a;">Revoke</button>` : ''}
                 </td>
-              </tr>
-            `).join('') : `<tr><td colspan="5" class="muted" style="text-align:center; padding:24px;">No passcodes issued yet</td></tr>`}
+              </tr>`;
+            }).join('') : `<tr><td colspan="7" class="muted" style="text-align:center;padding:24px;">No leaders invited yet</td></tr>`}
           </tbody>
         </table>
       </div>
@@ -3680,21 +3736,39 @@ function renderAdminInvite() {
     const phone = document.getElementById('invitePhone').value.trim();
     const email = document.getElementById('inviteEmail').value.trim();
     const portal = document.getElementById('invitePortal').value;
-    if (!name || !phone) { alert("Please enter the leader's full name and phone number."); return; }
+    const msg = document.getElementById('inviteMsg');
+    if (!name || !phone) {
+      msg.textContent = "Please enter the leader's full name and phone number.";
+      return;
+    }
     const prefix = PORTAL_PASSCODE_PREFIX[portal];
     const rand = Math.floor(1000 + Math.random() * 9000);
     const code = `${prefix}-2026-${rand}`;
     const dbNow = loadDB();
-    dbNow.passcodes.push({
-      id: uid('pc'), role: portal, label: name, code,
-      generatedBy: dbNow.owner.name, generatedAt: new Date().toISOString(), revoked: false
+    // Revoke previous active passcodes for same portal (optional: keep history)
+    dbNow.passcodes.forEach(p => {
+      if (p.role === portal && !p.revoked) p.revoked = true;
     });
+    dbNow.passcodes.push({
+      id: uid('pc'),
+      role: portal,
+      label: name,
+      email: email,
+      phone: phone,
+      code,
+      generatedBy: dbNow.owner.name,
+      generatedAt: new Date().toISOString(),
+      revoked: false,
+      status: 'active'
+    });
+    if (!dbNow.portalProfiles[portal]) dbNow.portalProfiles[portal] = { name: '', phone: '', email: '', photo: '' };
     dbNow.portalProfiles[portal].name = name;
     dbNow.portalProfiles[portal].phone = phone;
     dbNow.portalProfiles[portal].email = email;
     saveDB(dbNow);
-    logAudit('super_admin', dbNow.owner.name, 'Generated portal passcode', `${PORTAL_DEFS[portal].label} — ${name}`);
-    alert(`Passcode generated: ${code}\n\nShare this with ${name} to access the ${PORTAL_DEFS[portal].label} portal.`);
+    logAudit('super_admin', dbNow.owner.name, 'Invited portal leader', `${PORTAL_DEFS[portal].label} — ${name}`);
+    msg.innerHTML = `Invite saved. Passcode for <strong>${name}</strong>: <code style="color:var(--gold)">${code}</code> — share it with them to open the ${PORTAL_DEFS[portal].label} portal.`;
+    alert(`Invite created for ${name}\\n\\nPortal: ${PORTAL_DEFS[portal].label}\\nPasscode: ${code}\\n\\nShare the passcode with them.\\nUse Reset Link only if their email exists in Firebase Authentication.`);
     renderAdminInvite();
   });
 
@@ -3702,7 +3776,7 @@ function renderAdminInvite() {
     btn.addEventListener('click', () => {
       const dbNow = loadDB();
       const rec = dbNow.passcodes.find(p => p.id === btn.dataset.revokepass);
-      if (rec && confirm(`Revoke passcode for ${rec.label}?`)) {
+      if (rec && confirm(`Revoke access for ${rec.label}?`)) {
         rec.revoked = true;
         saveDB(dbNow);
         logAudit('super_admin', dbNow.owner.name, 'Revoked portal passcode', rec.label);
@@ -3710,7 +3784,42 @@ function renderAdminInvite() {
       }
     });
   });
+
+  document.querySelectorAll('[data-resetmail]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const dbNow = loadDB();
+      const rec = dbNow.passcodes.find(p => p.id === btn.dataset.resetmail);
+      if (!rec) return;
+      const email = rec.email || (dbNow.portalProfiles[rec.role] && dbNow.portalProfiles[rec.role].email) || '';
+      if (!email) {
+        alert('No email on this record.');
+        return;
+      }
+      if (!_auth) {
+        alert('Firebase Auth not loaded.');
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = 'Sending…';
+      try {
+        await _auth.sendPasswordResetEmail(email);
+        logAudit('super_admin', dbNow.owner.name, 'Sent password reset email', email);
+        alert(`Password reset email sent to ${email}.\\n\\nThey must already exist under Firebase Authentication → Users.\\nPortal login still uses the passcode unless you wire email login for that portal later.`);
+      } catch (e) {
+        console.warn(e);
+        const code = e && e.code;
+        if (code === 'auth/user-not-found') {
+          alert(`No Firebase Auth user for ${email}.\\n\\nAdd them under Authentication → Users (email/password), then click Reset Link again.\\nMeanwhile they can still use passcode: ${rec.code}`);
+        } else {
+          alert((e && e.message) || 'Failed to send reset email.');
+        }
+      }
+      btn.disabled = false;
+      renderAdminInvite();
+    });
+  });
 }
+
 
 /* ---------- Received tab: New contact messages, Store, Internal messages ---------- */
 function renderAdminReceived() {
