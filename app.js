@@ -33,6 +33,7 @@ const FIRESTORE_DOC = { collection: 'appData', id: 'main' };
 let _firebaseApp = null;
 let _firestore = null;
 let _auth = null;
+let _storage = null;
 let _cloudSaveTimer = null;
 let _cloudReady = false;
 let _cloudEnabled = true; // set false to force localStorage-only
@@ -51,6 +52,7 @@ function initFirebase() {
     }
     _firestore = firebase.firestore();
     _auth = firebase.auth();
+    _storage = firebase.storage();
     _cloudEnabled = true;
     return true;
   } catch (e) {
@@ -132,6 +134,7 @@ async function bootApp() {
   initNav();
   initThemeToggle();
   initTyping();
+  applyHeroBackground(db);
   renderLeadershipPyramid(db);
   initCardTapFlip();
   renderNoticeboard(db);
@@ -481,6 +484,22 @@ function fileToBase64(file, maxDim = 900, quality = 0.72) {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+/**
+ * Upload a File to Firebase Storage and return its public download URL.
+ * path e.g. 'hero/hero-bg.jpg' — reusing the same path overwrites the old file,
+ * so the bucket doesn't fill up with every old hero photo.
+ * Falls back to base64 (old behavior) if Storage isn't available.
+ */
+async function uploadImageToStorage(file, path) {
+  if (!_cloudEnabled || !_storage) {
+    console.warn('Firebase Storage unavailable — falling back to base64.');
+    return fileToBase64(file, 1600, 0.72);
+  }
+  const ref = _storage.ref().child(path);
+  await ref.put(file);
+  return await ref.getDownloadURL();
 }
 
 /* ============================================================
@@ -3534,31 +3553,48 @@ function renderAdminProfile() {
 
   // Hero background
   let pendingHeroBg = db.heroBackground || '';
+  let pendingHeroBgFile = null;
   document.getElementById('heroBgInput')?.addEventListener('change', async (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
     try {
-      pendingHeroBg = await fileToBase64(file, 1600, 0.72);
+      pendingHeroBgFile = file;
+      // instant local preview only — not what gets saved
+      const previewUrl = await fileToBase64(file, 1600, 0.72);
       const prev = document.getElementById('heroBgPreview');
-      if (prev) prev.innerHTML = `<img src="${pendingHeroBg}" alt="Hero background" style="width:100%;height:100%;object-fit:cover;">`;
+      if (prev) prev.innerHTML = `<img src="${previewUrl}" alt="Hero background" style="width:100%;height:100%;object-fit:cover;">`;
       const msg = document.getElementById('heroBgMsg');
       if (msg) msg.textContent = 'Preview ready — click Save background.';
     } catch (err) {
       alert('Could not read image.');
     }
   });
-  document.getElementById('heroBgSaveBtn')?.addEventListener('click', () => {
-    const dbNow = loadDB();
-    dbNow.heroBackground = pendingHeroBg || '';
-    saveDB(dbNow);
-    applyHeroBackground(dbNow);
-    logAudit('super_admin', dbNow.owner.name, 'Updated home hero background');
+  document.getElementById('heroBgSaveBtn')?.addEventListener('click', async () => {
     const msg = document.getElementById('heroBgMsg');
-    if (msg) msg.textContent = 'Background saved. Check the Home page.';
+    const btn = document.getElementById('heroBgSaveBtn');
+    try {
+      if (pendingHeroBgFile) {
+        if (msg) msg.textContent = 'Uploading photo...';
+        if (btn) btn.disabled = true;
+        pendingHeroBg = await uploadImageToStorage(pendingHeroBgFile, 'hero/hero-bg.jpg');
+      }
+      const dbNow = loadDB();
+      dbNow.heroBackground = pendingHeroBg || '';
+      saveDB(dbNow);
+      applyHeroBackground(dbNow);
+      logAudit('super_admin', dbNow.owner.name, 'Updated home hero background');
+      if (msg) msg.textContent = 'Background saved. Check the Home page.';
+    } catch (err) {
+      console.error('Hero background upload failed', err);
+      if (msg) msg.textContent = 'Upload failed — check your connection and try again.';
+    } finally {
+      if (btn) btn.disabled = false;
+    }
   });
   document.getElementById('heroBgClearBtn')?.addEventListener('click', () => {
     if (!confirm('Remove the hero background photo?')) return;
     pendingHeroBg = '';
+    pendingHeroBgFile = null;
     const dbNow = loadDB();
     dbNow.heroBackground = '';
     saveDB(dbNow);
